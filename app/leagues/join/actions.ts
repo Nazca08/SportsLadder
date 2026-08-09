@@ -30,6 +30,10 @@ export async function joinLeague(formData: FormData) {
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) redirect("/login");
 
+  // TEMPORARY DIAGNOSTIC -- remove once the RLS issue is resolved.
+  const { data: whoAmI, error: whoAmIError } = await supabase.rpc("debug_whoami");
+  console.log("DEBUG joinLeague -- getUser().id:", user.id, "| Postgres auth.uid():", whoAmI, "| rpc error:", whoAmIError);
+
   const sport = String(formData.get("sport"));
   const format = String(formData.get("format"));
   const division = String(formData.get("division"));
