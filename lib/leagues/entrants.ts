@@ -1,0 +1,79 @@
+import type { SupabaseClient } from "@supabase/supabase-js";
+
+/** Maps every entrant id (player or team) in a league season to a display name. */
+export async function getEntrantNames(
+  supabase: SupabaseClient,
+  leagueSeasonId: string
+): Promise<Map<string, string>> {
+  const { data: enrollments } = await supabase
+    .from("enrollments")
+    .select("player_id, team_id")
+    .eq("league_season_id", leagueSeasonId);
+
+  const playerIds = (enrollments ?? []).map((e) => e.player_id).filter(Boolean) as string[];
+  const teamIds = (enrollments ?? []).map((e) => e.team_id).filter(Boolean) as string[];
+
+  const [{ data: profiles }, { data: teams }] = await Promise.all([
+    playerIds.length
+      ? supabase.from("profiles").select("id, full_name").in("id", playerIds)
+      : Promise.resolve({ data: [] as { id: string; full_name: string }[] }),
+    teamIds.length
+      ? supabase.from("teams").select("id, name").in("id", teamIds)
+      : Promise.resolve({ data: [] as { id: string; name: string }[] }),
+  ]);
+
+  const map = new Map<string, string>();
+  (profiles ?? []).forEach((p) => map.set(p.id, p.full_name));
+  (teams ?? []).forEach((t) => map.set(t.id, t.name));
+  return map;
+}
+
+/** Returns the entrant id (player id, or team id) this user competes as in a league. Null if not enrolled. */
+export async function getMyEntrantId(
+  supabase: SupabaseClient,
+  leagueSeasonId: string,
+  userId: string
+): Promise<string | null> {
+  const { data: directEnrollment } = await supabase
+    .from("enrollments")
+    .select("player_id")
+    .eq("league_season_id", leagueSeasonId)
+    .eq("player_id", userId)
+    .maybeSingle();
+  if (directEnrollment) return userId;
+
+  const { data: team } = await supabase
+    .from("teams")
+    .select("id")
+    .eq("league_season_id", leagueSeasonId)
+    .or(`player1_id.eq.${userId},player2_id.eq.${userId}`)
+    .maybeSingle();
+
+  return team ? team.id : null;
+}
+
+/**
+ * Given a match and a specific user, figures out which side of that match (if
+ * either) that user competes as -- resolving through team membership for
+ * doubles matches. Used to stop the reporting side from also confirming
+ * their own score.
+ */
+export async function getEntrantIdForUserInMatch(
+  supabase: SupabaseClient,
+  match: { entrant_a_id: string; entrant_b_id: string | null },
+  userId: string
+): Promise<string | null> {
+  if (match.entrant_a_id === userId || match.entrant_b_id === userId) return userId;
+
+  const candidateIds = [match.entrant_a_id, match.entrant_b_id].filter(Boolean) as string[];
+  if (candidateIds.length === 0) return null;
+
+  const { data: team } = await supabase
+    .from("teams")
+    .select("id")
+    .in("id", candidateIds)
+    .or(`player1_id.eq.${userId},player2_id.eq.${userId}`)
+    .maybeSingle();
+
+  return team ? team.id : null;
+}
