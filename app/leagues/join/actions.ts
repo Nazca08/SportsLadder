@@ -72,16 +72,19 @@ export async function joinLeague(formData: FormData) {
   const { data: whoAmI2, error: whoAmI2Error } = await supabase.rpc("debug_whoami");
   console.log("DEBUG joinLeague (right before insert) -- user.id:", user.id, "| Postgres auth.uid():", whoAmI2, "| rpc error:", whoAmI2Error);
 
+  const insertPayload = {
+    league_season_id: leagueSeasonId,
+    player_id: format === "doubles" ? null : user.id,
+    team_id: format === "doubles" ? entrantId : null,
+    // Real Stripe checkout is a follow-up integration -- nothing in the UI
+    // gates on `paid` yet, so this stays false rather than faking a payment.
+    paid: false,
+  };
+  console.log("DEBUG joinLeague -- exact insert payload:", JSON.stringify(insertPayload), "| format value:", JSON.stringify(format), "| typeof format:", typeof format);
+
   const { data: enrollment, error: enrollError } = await supabase
     .from("enrollments")
-    .insert({
-      league_season_id: leagueSeasonId,
-      player_id: format === "doubles" ? null : user.id,
-      team_id: format === "doubles" ? entrantId : null,
-      // Real Stripe checkout is a follow-up integration -- nothing in the UI
-      // gates on `paid` yet, so this stays false rather than faking a payment.
-      paid: false,
-    })
+    .insert(insertPayload)
     .select("id")
     .single();
   if (enrollError) throw enrollError;
