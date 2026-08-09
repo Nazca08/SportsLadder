@@ -1,5 +1,6 @@
 import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
+import { SignOutButton } from "@/components/sign-out-button";
 
 function leagueLabel(t: { sport: string; format: string; division: string; level: string }) {
   const sport = t.sport === "tennis" ? "Tennis" : "Pickleball";
@@ -39,7 +40,10 @@ export default async function DashboardPage() {
 
   return (
     <main className="min-h-screen p-8 max-w-2xl mx-auto">
-      <h1 className="font-display text-2xl font-bold">Welcome, {profile?.full_name ?? "player"}.</h1>
+      <div className="flex items-center justify-between mb-2">
+        <h1 className="font-display text-2xl font-bold">Welcome, {profile?.full_name ?? "player"}.</h1>
+        <SignOutButton />
+      </div>
 
       <div className="flex items-center justify-between mt-8 mb-3">
         <h2 className="font-display text-lg font-semibold">Your leagues</h2>
