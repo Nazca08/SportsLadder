@@ -2,6 +2,7 @@ import { redirect, notFound } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { getMyEntrantId, getEntrantNames } from "@/lib/leagues/entrants";
 import { computeLeagueStandings } from "@/lib/leagues/standings";
+import { SignOutButton } from "@/components/sign-out-button";
 import { LeagueClient } from "./league-client";
 
 function leagueLabel(t: { sport: string; format: string; division: string; level: string }) {
@@ -59,7 +60,10 @@ export default async function LeaguePage({ params }: { params: { id: string } })
     <main className="min-h-screen p-6 max-w-4xl mx-auto">
       <div className="flex items-center justify-between mb-1 flex-wrap gap-2">
         <h1 className="font-display text-2xl font-bold">{template ? leagueLabel(template as any) : "League"}</h1>
-        <a href="/dashboard" className="text-chalk-dim text-sm hover:text-chalk">&larr; All leagues</a>
+        <div className="flex items-center gap-4">
+          <a href="/dashboard" className="text-chalk-dim text-sm hover:text-chalk">&larr; All leagues</a>
+          <SignOutButton />
+        </div>
       </div>
       <LeagueClient
         leagueSeasonId={leagueSeasonId}
