@@ -67,6 +67,11 @@ export async function joinLeague(formData: FormData) {
     entrantId = user.id;
   }
 
+  // TEMPORARY DIAGNOSTIC -- second check, right before the insert that fails,
+  // to see if identity has changed since the first check at the top.
+  const { data: whoAmI2, error: whoAmI2Error } = await supabase.rpc("debug_whoami");
+  console.log("DEBUG joinLeague (right before insert) -- user.id:", user.id, "| Postgres auth.uid():", whoAmI2, "| rpc error:", whoAmI2Error);
+
   const { data: enrollment, error: enrollError } = await supabase
     .from("enrollments")
     .insert({
