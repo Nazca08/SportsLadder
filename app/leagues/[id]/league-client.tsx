@@ -136,6 +136,10 @@ function ScoreForm({
 export function LeagueClient({ leagueSeasonId, sport, myEntrantId, entrantNames, entrantAvatars, standings, matches, resultsByMatch }: Props) {
   const [tab, setTab] = useState<"rankings" | "offers" | "challenges" | "matches">("rankings");
   const name = (id: string) => entrantNames[id] ?? "Unknown";
+  const rank = (id: string): number | null => {
+    const i = standings.findIndex((s) => s.entrantId === id);
+    return i === -1 ? null : i + 1;
+  };
 
   return (
     <div>
@@ -148,8 +152,8 @@ export function LeagueClient({ leagueSeasonId, sport, myEntrantId, entrantNames,
       </div>
 
       {tab === "rankings" && <RankingsTab standings={standings} name={name} myEntrantId={myEntrantId} />}
-      {tab === "offers" && <OffersTab leagueSeasonId={leagueSeasonId} matches={matches} name={name} avatar={(id: string) => entrantAvatars[id] ?? null} myEntrantId={myEntrantId} />}
-      {tab === "challenges" && <ChallengesTab leagueSeasonId={leagueSeasonId} matches={matches} standings={standings} name={name} avatar={(id: string) => entrantAvatars[id] ?? null} myEntrantId={myEntrantId} />}
+      {tab === "offers" && <OffersTab leagueSeasonId={leagueSeasonId} matches={matches} name={name} avatar={(id: string) => entrantAvatars[id] ?? null} rank={rank} myEntrantId={myEntrantId} />}
+      {tab === "challenges" && <ChallengesTab leagueSeasonId={leagueSeasonId} matches={matches} standings={standings} name={name} avatar={(id: string) => entrantAvatars[id] ?? null} rank={rank} myEntrantId={myEntrantId} />}
       {tab === "matches" && <MatchesTab sport={sport} matches={matches} resultsByMatch={resultsByMatch} name={name} myEntrantId={myEntrantId} />}
     </div>
   );
@@ -175,7 +179,7 @@ function RankingsTab({ standings, name, myEntrantId }: { standings: StandingsRow
   );
 }
 
-function OffersTab({ leagueSeasonId, matches, name, avatar, myEntrantId }: { leagueSeasonId: string; matches: Match[]; name: (id: string) => string; avatar: (id: string) => string | null; myEntrantId: string | null }) {
+function OffersTab({ leagueSeasonId, matches, name, avatar, rank, myEntrantId }: { leagueSeasonId: string; matches: Match[]; name: (id: string) => string; avatar: (id: string) => string | null; rank: (id: string) => number | null; myEntrantId: string | null }) {
   const { run, pending, error } = useAction();
   const [showForm, setShowForm] = useState(false);
   const [collapsed, setCollapsed] = useState(false);
@@ -225,7 +229,11 @@ function OffersTab({ leagueSeasonId, matches, name, avatar, myEntrantId }: { lea
         {others.map((m) => (
           <div key={m.id} className="flex items-center gap-4 bg-court-deep rounded-xl px-4 py-3 border border-white/10 flex-wrap">
             <Avatar name={name(m.entrant_a_id)} avatarUrl={avatar(m.entrant_a_id)} />
-            <div className="flex-1 text-sm">{name(m.entrant_a_id)} &middot; {m.scheduled_date} {m.scheduled_time} &middot; {m.location}</div>
+            <div className="flex-1 text-sm">
+              {name(m.entrant_a_id)}
+              {rank(m.entrant_a_id) && <span className="text-ball text-xs font-score ml-1.5">#{rank(m.entrant_a_id)}</span>}
+              {" "}&middot; {m.scheduled_date} {m.scheduled_time} &middot; {m.location}
+            </div>
             <button onClick={() => run(() => acceptOffer(m.id))} className="bg-ball text-ink font-display text-xs font-semibold rounded-lg px-3 py-1.5">Accept</button>
           </div>
         ))}
@@ -234,7 +242,7 @@ function OffersTab({ leagueSeasonId, matches, name, avatar, myEntrantId }: { lea
   );
 }
 
-function ChallengesTab({ leagueSeasonId, matches, standings, name, avatar, myEntrantId }: { leagueSeasonId: string; matches: Match[]; standings: StandingsRow[]; name: (id: string) => string; avatar: (id: string) => string | null; myEntrantId: string | null }) {
+function ChallengesTab({ leagueSeasonId, matches, standings, name, avatar, rank, myEntrantId }: { leagueSeasonId: string; matches: Match[]; standings: StandingsRow[]; name: (id: string) => string; avatar: (id: string) => string | null; rank: (id: string) => number | null; myEntrantId: string | null }) {
   const { run, pending, error } = useAction();
   const [opponentId, setOpponentId] = useState("");
 
@@ -254,7 +262,7 @@ function ChallengesTab({ leagueSeasonId, matches, standings, name, avatar, myEnt
           <select value={opponentId} onChange={(e) => setOpponentId(e.target.value)} className="bg-panel border border-white/10 rounded-lg px-2 py-2 text-sm">
             <option value="">Opponent\u2026</option>
             {standings.filter((s) => s.entrantId !== myEntrantId).map((s) => (
-              <option key={s.entrantId} value={s.entrantId}>{name(s.entrantId)}</option>
+              <option key={s.entrantId} value={s.entrantId}>#{rank(s.entrantId)} {name(s.entrantId)}</option>
             ))}
           </select>
           <input name="date" type="date" required className="bg-panel border border-white/10 rounded-lg px-2 py-2 text-sm" />
@@ -271,7 +279,11 @@ function ChallengesTab({ leagueSeasonId, matches, standings, name, avatar, myEnt
         {incoming.map((m) => (
           <div key={m.id} className="flex items-center gap-4 bg-court-deep rounded-xl px-4 py-3 border border-white/10 mb-2 flex-wrap">
             <Avatar name={name(m.entrant_a_id)} avatarUrl={avatar(m.entrant_a_id)} />
-            <div className="flex-1 text-sm">{name(m.entrant_a_id)} challenged you &middot; {m.scheduled_date} {m.scheduled_time}</div>
+            <div className="flex-1 text-sm">
+              {name(m.entrant_a_id)}
+              {rank(m.entrant_a_id) && <span className="text-ball text-xs font-score ml-1.5">#{rank(m.entrant_a_id)}</span>}
+              {" "}challenged you &middot; {m.scheduled_date} {m.scheduled_time}
+            </div>
             <button onClick={() => run(() => respondChallenge(m.id, true))} className="bg-ball text-ink rounded-lg px-3 py-1.5 text-xs font-display font-semibold">Accept</button>
             <button onClick={() => run(() => respondChallenge(m.id, false))} className="border border-white/10 rounded-lg px-3 py-1.5 text-xs">Decline</button>
           </div>
