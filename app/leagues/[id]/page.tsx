@@ -3,13 +3,17 @@ import { createClient } from "@/lib/supabase/server";
 import { getMyEntrantId, getEntrantNames, getEntrantIdForUserInMatch } from "@/lib/leagues/entrants";
 import { computeLeagueStandings } from "@/lib/leagues/standings";
 import { SignOutButton } from "@/components/sign-out-button";
+import { AREAS } from "@/lib/leagues/divisions";
 import { LeagueClient } from "./league-client";
 
-function leagueLabel(t: { sport: string; format: string; division: string; level: string }) {
+const areaName = (code?: string) => AREAS.find(([c]) => c === code)?.[1] ?? code;
+
+function leagueLabel(t: { sport: string; format: string; division: string; level: string; area?: string }) {
   const sport = t.sport === "tennis" ? "Tennis" : "Pickleball";
   const format = t.format === "doubles" ? "Doubles" : "Singles";
   const division = t.division === "mixed" ? "Mixed" : t.division === "mens" ? "Men's" : "Women's";
-  return `${sport} ${format} \u00b7 ${division} \u00b7 ${t.level}`;
+  const area = areaName(t.area);
+  return `${sport} ${format} \u00b7 ${division} \u00b7 ${t.level}${area ? ` \u00b7 ${area}` : ""}`;
 }
 
 export default async function LeaguePage({ params }: { params: { id: string } }) {
@@ -28,7 +32,7 @@ export default async function LeaguePage({ params }: { params: { id: string } })
 
   const { data: leagueSeason } = await supabase
     .from("league_seasons")
-    .select("id, league_templates(sport, format, division, level)")
+    .select("id, league_templates(sport, format, division, level, area)")
     .eq("id", leagueSeasonId)
     .single();
   if (!leagueSeason) notFound();
