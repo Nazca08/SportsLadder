@@ -79,6 +79,7 @@ export default async function LeaguePage({ params }: { params: { id: string } })
         <h1 className="font-display text-2xl font-bold">{template ? leagueLabel(template as any) : "League"}</h1>
         <div className="flex items-center gap-4">
           <a href="/dashboard" className="text-chalk-dim text-sm hover:text-chalk">&larr; All leagues</a>
+          <a href="/settings" className="text-chalk-dim text-sm hover:text-chalk">Settings</a>
           <SignOutButton />
         </div>
       </div>
