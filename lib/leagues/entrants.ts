@@ -28,6 +28,23 @@ export async function getEntrantNames(
   return map;
 }
 
+/** Maps every player entrant in a league season to their avatar URL (teams don't have one). */
+export async function getEntrantAvatars(
+  supabase: SupabaseClient,
+  leagueSeasonId: string
+): Promise<Map<string, string | null>> {
+  const { data: enrollments } = await supabase
+    .from("enrollments")
+    .select("player_id")
+    .eq("league_season_id", leagueSeasonId);
+
+  const playerIds = (enrollments ?? []).map((e) => e.player_id).filter(Boolean) as string[];
+  if (playerIds.length === 0) return new Map();
+
+  const { data: profiles } = await supabase.from("profiles").select("id, avatar_url").in("id", playerIds);
+  return new Map((profiles ?? []).map((p) => [p.id, p.avatar_url ?? null]));
+}
+
 /** Returns the entrant id (player id, or team id) this user competes as in a league. Null if not enrolled. */
 export async function getMyEntrantId(
   supabase: SupabaseClient,
