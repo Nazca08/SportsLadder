@@ -34,10 +34,27 @@ type Props = {
   sport: "tennis" | "pickleball";
   myEntrantId: string | null;
   entrantNames: Record<string, string>;
+  entrantAvatars: Record<string, string | null>;
   standings: StandingsRow[];
   matches: Match[];
   resultsByMatch: Record<string, MatchResult>;
 };
+
+function initials(name: string) {
+  return name.split(" ").map((w) => w[0]).join("").slice(0, 2).toUpperCase();
+}
+
+function Avatar({ name, avatarUrl }: { name: string; avatarUrl?: string | null }) {
+  if (avatarUrl) {
+    // eslint-disable-next-line @next/next/no-img-element
+    return <img src={avatarUrl} alt={name} className="w-8 h-8 rounded-full object-cover shrink-0" />;
+  }
+  return (
+    <div className="w-8 h-8 rounded-full bg-ball text-ink flex items-center justify-center text-xs font-display font-bold shrink-0">
+      {initials(name)}
+    </div>
+  );
+}
 
 function useAction() {
   const router = useRouter();
@@ -116,7 +133,7 @@ function ScoreForm({
   );
 }
 
-export function LeagueClient({ leagueSeasonId, sport, myEntrantId, entrantNames, standings, matches, resultsByMatch }: Props) {
+export function LeagueClient({ leagueSeasonId, sport, myEntrantId, entrantNames, entrantAvatars, standings, matches, resultsByMatch }: Props) {
   const [tab, setTab] = useState<"rankings" | "offers" | "challenges" | "matches">("rankings");
   const name = (id: string) => entrantNames[id] ?? "Unknown";
 
@@ -131,8 +148,8 @@ export function LeagueClient({ leagueSeasonId, sport, myEntrantId, entrantNames,
       </div>
 
       {tab === "rankings" && <RankingsTab standings={standings} name={name} myEntrantId={myEntrantId} />}
-      {tab === "offers" && <OffersTab leagueSeasonId={leagueSeasonId} matches={matches} name={name} myEntrantId={myEntrantId} />}
-      {tab === "challenges" && <ChallengesTab leagueSeasonId={leagueSeasonId} matches={matches} standings={standings} name={name} myEntrantId={myEntrantId} />}
+      {tab === "offers" && <OffersTab leagueSeasonId={leagueSeasonId} matches={matches} name={name} avatar={(id: string) => entrantAvatars[id] ?? null} myEntrantId={myEntrantId} />}
+      {tab === "challenges" && <ChallengesTab leagueSeasonId={leagueSeasonId} matches={matches} standings={standings} name={name} avatar={(id: string) => entrantAvatars[id] ?? null} myEntrantId={myEntrantId} />}
       {tab === "matches" && <MatchesTab sport={sport} matches={matches} resultsByMatch={resultsByMatch} name={name} myEntrantId={myEntrantId} />}
     </div>
   );
@@ -158,7 +175,7 @@ function RankingsTab({ standings, name, myEntrantId }: { standings: StandingsRow
   );
 }
 
-function OffersTab({ leagueSeasonId, matches, name, myEntrantId }: { leagueSeasonId: string; matches: Match[]; name: (id: string) => string; myEntrantId: string | null }) {
+function OffersTab({ leagueSeasonId, matches, name, avatar, myEntrantId }: { leagueSeasonId: string; matches: Match[]; name: (id: string) => string; avatar: (id: string) => string | null; myEntrantId: string | null }) {
   const { run, pending, error } = useAction();
   const [showForm, setShowForm] = useState(false);
   const [collapsed, setCollapsed] = useState(false);
@@ -207,6 +224,7 @@ function OffersTab({ leagueSeasonId, matches, name, myEntrantId }: { leagueSeaso
         {others.length === 0 && <p className="text-chalk-dim text-sm">Nothing open right now.</p>}
         {others.map((m) => (
           <div key={m.id} className="flex items-center gap-4 bg-court-deep rounded-xl px-4 py-3 border border-white/10 flex-wrap">
+            <Avatar name={name(m.entrant_a_id)} avatarUrl={avatar(m.entrant_a_id)} />
             <div className="flex-1 text-sm">{name(m.entrant_a_id)} &middot; {m.scheduled_date} {m.scheduled_time} &middot; {m.location}</div>
             <button onClick={() => run(() => acceptOffer(m.id))} className="bg-ball text-ink font-display text-xs font-semibold rounded-lg px-3 py-1.5">Accept</button>
           </div>
@@ -216,7 +234,7 @@ function OffersTab({ leagueSeasonId, matches, name, myEntrantId }: { leagueSeaso
   );
 }
 
-function ChallengesTab({ leagueSeasonId, matches, standings, name, myEntrantId }: { leagueSeasonId: string; matches: Match[]; standings: StandingsRow[]; name: (id: string) => string; myEntrantId: string | null }) {
+function ChallengesTab({ leagueSeasonId, matches, standings, name, avatar, myEntrantId }: { leagueSeasonId: string; matches: Match[]; standings: StandingsRow[]; name: (id: string) => string; avatar: (id: string) => string | null; myEntrantId: string | null }) {
   const { run, pending, error } = useAction();
   const [opponentId, setOpponentId] = useState("");
 
@@ -252,6 +270,7 @@ function ChallengesTab({ leagueSeasonId, matches, standings, name, myEntrantId }
         {incoming.length === 0 && <p className="text-chalk-dim text-sm">Nothing incoming.</p>}
         {incoming.map((m) => (
           <div key={m.id} className="flex items-center gap-4 bg-court-deep rounded-xl px-4 py-3 border border-white/10 mb-2 flex-wrap">
+            <Avatar name={name(m.entrant_a_id)} avatarUrl={avatar(m.entrant_a_id)} />
             <div className="flex-1 text-sm">{name(m.entrant_a_id)} challenged you &middot; {m.scheduled_date} {m.scheduled_time}</div>
             <button onClick={() => run(() => respondChallenge(m.id, true))} className="bg-ball text-ink rounded-lg px-3 py-1.5 text-xs font-display font-semibold">Accept</button>
             <button onClick={() => run(() => respondChallenge(m.id, false))} className="border border-white/10 rounded-lg px-3 py-1.5 text-xs">Decline</button>
@@ -277,6 +296,7 @@ function MatchesTab({ sport, matches, resultsByMatch, name, myEntrantId }: { spo
   const { run, error } = useAction();
 
   const scheduled = matches.filter((m) => m.status === "scheduled" && (m.entrant_a_id === myEntrantId || m.entrant_b_id === myEntrantId));
+  const disputed = matches.filter((m) => m.status === "disputed" && (m.entrant_a_id === myEntrantId || m.entrant_b_id === myEntrantId));
   const completed = matches.filter((m) => m.status === "completed" && (m.entrant_a_id === myEntrantId || m.entrant_b_id === myEntrantId));
 
   return (
@@ -314,6 +334,18 @@ function MatchesTab({ sport, matches, resultsByMatch, name, myEntrantId }: { spo
           );
         })}
       </div>
+
+      {disputed.length > 0 && (
+        <div>
+          <h3 className="font-display font-semibold mb-3">Disputed</h3>
+          {disputed.map((m) => (
+            <div key={m.id} className="bg-court-deep border border-paddle/40 rounded-xl p-4 mb-3 text-sm">
+              {name(m.entrant_a_id)} vs {m.entrant_b_id ? name(m.entrant_b_id) : "\u2014"} &middot; {m.scheduled_date} {m.scheduled_time}
+              <div className="text-chalk-dim text-xs mt-1">Waiting on an admin to resolve this one.</div>
+            </div>
+          ))}
+        </div>
+      )}
 
       <div>
         <h3 className="font-display font-semibold mb-3">Match history</h3>
