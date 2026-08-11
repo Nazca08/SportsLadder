@@ -1,6 +1,6 @@
 import { redirect, notFound } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
-import { getMyEntrantId, getEntrantNames } from "@/lib/leagues/entrants";
+import { getMyEntrantId, getEntrantNames, getEntrantIdForUserInMatch } from "@/lib/leagues/entrants";
 import { computeLeagueStandings } from "@/lib/leagues/standings";
 import { SignOutButton } from "@/components/sign-out-button";
 import { LeagueClient } from "./league-client";
@@ -54,7 +54,20 @@ export default async function LeaguePage({ params }: { params: { id: string } })
   const { data: results } = completedIds.length
     ? await supabase.from("match_results").select("*").in("match_id", completedIds)
     : { data: [] as any[] };
-  const resultsByMatch = new Map((results ?? []).map((r) => [r.match_id, r]));
+
+  // Figure out which entrant (player or team) reported each result, so the
+  // client can tell "you're waiting on the other side" apart from "you need
+  // to confirm this" -- without this, the reporting side sees a Confirm
+  // button that errors when clicked, which is confusing rather than helpful.
+  const matchById = new Map(matches.map((m) => [m.id, m]));
+  const resultsWithReporterEntrant = await Promise.all(
+    (results ?? []).map(async (r) => {
+      const match = matchById.get(r.match_id);
+      const reporterEntrantId = match ? await getEntrantIdForUserInMatch(supabase, match, r.reported_by) : null;
+      return { ...r, reporter_entrant_id: reporterEntrantId };
+    })
+  );
+  const resultsByMatch = new Map(resultsWithReporterEntrant.map((r) => [r.match_id, r]));
 
   return (
     <main className="min-h-screen p-6 max-w-4xl mx-auto">
