@@ -1,8 +1,9 @@
 import { redirect, notFound } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
-import { getMyEntrantId, getEntrantNames, getEntrantIdForUserInMatch } from "@/lib/leagues/entrants";
+import { getMyEntrantId, getEntrantNames, getEntrantAvatars, getEntrantIdForUserInMatch } from "@/lib/leagues/entrants";
 import { computeLeagueStandings } from "@/lib/leagues/standings";
 import { SignOutButton } from "@/components/sign-out-button";
+import { LeaveLeagueButton } from "@/components/leave-league-button";
 import { AREAS } from "@/lib/leagues/divisions";
 import { LeagueClient } from "./league-client";
 
@@ -43,6 +44,7 @@ export default async function LeaguePage({ params }: { params: { id: string } })
 
   const myEntrantId = await getMyEntrantId(supabase, leagueSeasonId, user.id);
   const entrantNames = await getEntrantNames(supabase, leagueSeasonId);
+  const entrantAvatars = await getEntrantAvatars(supabase, leagueSeasonId);
   const standings = await computeLeagueStandings(supabase, leagueSeasonId);
 
   const { data: allMatches } = await supabase
@@ -80,6 +82,7 @@ export default async function LeaguePage({ params }: { params: { id: string } })
         <div className="flex items-center gap-4">
           <a href="/dashboard" className="text-chalk-dim text-sm hover:text-chalk">&larr; All leagues</a>
           <a href="/settings" className="text-chalk-dim text-sm hover:text-chalk">Settings</a>
+          <LeaveLeagueButton enrollmentId={params.id} />
           <SignOutButton />
         </div>
       </div>
@@ -88,6 +91,7 @@ export default async function LeaguePage({ params }: { params: { id: string } })
         sport={(template as any)?.sport ?? "tennis"}
         myEntrantId={myEntrantId}
         entrantNames={Object.fromEntries(entrantNames)}
+        entrantAvatars={Object.fromEntries(entrantAvatars)}
         standings={standings}
         matches={matches}
         resultsByMatch={Object.fromEntries(resultsByMatch)}
