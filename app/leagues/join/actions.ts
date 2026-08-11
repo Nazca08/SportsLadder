@@ -32,13 +32,17 @@ export async function joinLeague(formData: FormData) {
   const format = String(formData.get("format"));
   const division = String(formData.get("division"));
   const level = String(formData.get("level"));
+  const area = String(formData.get("area"));
   const partnerId = formData.get("partnerId") ? String(formData.get("partnerId")) : null;
 
+  if (!area) {
+    throw new Error("Pick your area to continue.");
+  }
   if (format === "doubles" && !partnerId) {
     throw new Error("Pick a partner to join a doubles league.");
   }
 
-  const leagueSeasonId = await ensureLeagueSeason(sport, format, division, level);
+  const leagueSeasonId = await ensureLeagueSeason(sport, format, division, level, area);
 
   let entrantId: string;
   if (format === "doubles") {
