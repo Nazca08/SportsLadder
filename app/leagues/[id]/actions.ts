@@ -1,6 +1,7 @@
 "use server";
 
 import { createClient } from "@/lib/supabase/server";
+import { getAuthedClient } from "@/lib/supabase/authed-client";
 import { getMyEntrantId, getEntrantIdForUserInMatch } from "@/lib/leagues/entrants";
 import { resolveTennisMatch, type SetScore } from "@/lib/scoring/tennis";
 import { resolvePickleballMatch, type GameScore } from "@/lib/scoring/pickleball";
@@ -178,6 +179,20 @@ export async function disputeScore(matchId: string) {
   const myEntrantId = await getEntrantIdForUserInMatch(supabase, match, user.id);
   if (!myEntrantId) throw new Error("You're not a participant in this match.");
 
-  const { error } = await supabase.from("match_results").delete().eq("match_id", matchId);
+  const { error: deleteError } = await supabase.from("match_results").delete().eq("match_id", matchId);
+  if (deleteError) throw deleteError;
+
+  // Marked disputed (not just reset to scheduled) so an admin can find it and
+  // step in -- see app/admin for resolving disputes.
+  const { error: statusError } = await supabase.from("matches").update({ status: "disputed" }).eq("id", matchId);
+  if (statusError) throw statusError;
+}
+
+/** Leaves a league. For a doubles enrollment, this removes the whole team's spot -- see leave_league() for the ownership check. */
+export async function leaveLeague(enrollmentId: string) {
+  const { supabase, user } = await getAuthedClient();
+  if (!supabase || !user) throw new Error("Not signed in.");
+
+  const { error } = await supabase.rpc("leave_league", { p_enrollment_id: enrollmentId });
   if (error) throw error;
 }
