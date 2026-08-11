@@ -14,3 +14,12 @@ export function divisionOptions(gender: Gender, format: Format): [Division, stri
 
 export const SPORTS = ["tennis", "pickleball"] as const;
 export const LEVELS = ["3.0", "3.5", "4.0", "4.5"] as const;
+
+/** The only markets StringLine currently operates in. */
+export const AREAS: [string, string][] = [
+  ["dallas-tx", "Dallas, Texas"],
+  ["utah-valley-ut", "Utah Valley, Utah"],
+  ["palmas-del-mar-pr", "Palmas Del Mar, Puerto Rico"],
+  ["minneapolis-mn", "Minneapolis, Minnesota"],
+  ["raleigh-nc", "Raleigh, North Carolina"],
+];
