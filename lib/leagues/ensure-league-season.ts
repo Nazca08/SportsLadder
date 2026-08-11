@@ -4,30 +4,34 @@ const CURRENT_SEASON_NAME = "Ongoing Season";
 
 /**
  * Finds or creates the league_season for this exact sport/format/division/level
- * combo, in whatever season is currently active. Real season scheduling (four
- * 3-month seasons a year, rollover, tournament windows) is a later build phase --
- * for now every enrollment lands in one continuously-running season so the core
- * league loop (offers, challenges, scoring, standings) can be built and tested
- * against something real.
+ * + area combo, in whatever season is currently active. `area` is one of the
+ * fixed markets StringLine operates in (see lib/leagues/divisions.ts AREAS) --
+ * someone in Dallas never sees someone in Raleigh's offers, challenges, or
+ * standings, even at the identical sport/format/division/level.
+ * Real season scheduling (four 3-month seasons a year, rollover, tournament
+ * windows) is a later build phase -- for now every enrollment lands in one
+ * continuously-running season so the core league loop (offers, challenges,
+ * scoring, standings) can be built and tested against something real.
  */
 export async function ensureLeagueSeason(
   sport: string,
   format: string,
   division: string,
-  level: string
+  level: string,
+  area: string
 ): Promise<string> {
   const admin = createAdminClient();
 
   let { data: template } = await admin
     .from("league_templates")
     .select("id")
-    .match({ sport, format, division, level })
+    .match({ sport, format, division, level, area })
     .maybeSingle();
 
   if (!template) {
     const { data: created, error } = await admin
       .from("league_templates")
-      .insert({ sport, format, division, level })
+      .insert({ sport, format, division, level, area })
       .select("id")
       .single();
     if (error) throw error;
