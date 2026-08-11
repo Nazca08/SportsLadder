@@ -16,10 +16,12 @@ export function isValidSet(a: number, b: number): boolean {
 }
 
 /**
- * Determines a best-of-3 match winner from played sets, and returns the
- * aggregate games across every set played (not just the deciding set) --
- * that aggregate feeds computePoints() so the full match is reflected,
- * not just the final set.
+ * Determines the match winner from however many sets were actually played --
+ * not locked to best-of-3. Whoever won more sets wins the match; an even
+ * split isn't allowed, since there'd be no winner to award points to.
+ * Returns the aggregate games across every set played (not just a "deciding"
+ * set) -- that aggregate feeds computePoints() so the full match is
+ * reflected.
  */
 export function resolveTennisMatch(sets: SetScore[]): TennisResult {
   if (sets.length === 0) {
@@ -32,8 +34,8 @@ export function resolveTennisMatch(sets: SetScore[]): TennisResult {
   }
   const setsWonA = sets.filter((s) => s.a > s.b).length;
   const setsWonB = sets.filter((s) => s.b > s.a).length;
-  if (setsWonA < 2 && setsWonB < 2) {
-    return { valid: false, error: "Match isn't finished \u2014 no one has won 2 sets." };
+  if (setsWonA === setsWonB) {
+    return { valid: false, error: "Sets played must produce a winner \u2014 add another set to break the tie." };
   }
   const gamesA = sets.reduce((sum, s) => sum + s.a, 0);
   const gamesB = sets.reduce((sum, s) => sum + s.b, 0);
