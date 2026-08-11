@@ -15,15 +15,15 @@ export async function getEntrantNames(
 
   const [{ data: profiles }, { data: teams }] = await Promise.all([
     playerIds.length
-      ? supabase.from("profiles").select("id, full_name").in("id", playerIds)
-      : Promise.resolve({ data: [] as { id: string; full_name: string }[] }),
+      ? supabase.from("profiles").select("id, full_name, display_name").in("id", playerIds)
+      : Promise.resolve({ data: [] as { id: string; full_name: string; display_name: string | null }[] }),
     teamIds.length
       ? supabase.from("teams").select("id, name").in("id", teamIds)
       : Promise.resolve({ data: [] as { id: string; name: string }[] }),
   ]);
 
   const map = new Map<string, string>();
-  (profiles ?? []).forEach((p) => map.set(p.id, p.full_name));
+  (profiles ?? []).forEach((p) => map.set(p.id, p.display_name || p.full_name));
   (teams ?? []).forEach((t) => map.set(t.id, t.name));
   return map;
 }
