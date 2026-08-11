@@ -2,7 +2,7 @@
 
 import { redirect } from "next/navigation";
 import { revalidatePath } from "next/cache";
-import { createClient } from "@/lib/supabase/server";
+import { getAuthedClient } from "@/lib/supabase/authed-client";
 import { ensureLeagueSeason } from "@/lib/leagues/ensure-league-season";
 
 export type PlayerSearchResult = { id: string; full_name: string };
@@ -10,9 +10,8 @@ export type PlayerSearchResult = { id: string; full_name: string };
 /** Search other players by name, for picking a doubles partner. */
 export async function searchPlayers(query: string): Promise<PlayerSearchResult[]> {
   if (query.trim().length < 2) return [];
-  const supabase = createClient();
-  const { data: { user } } = await supabase.auth.getUser();
-  if (!user) return [];
+  const { supabase, user } = await getAuthedClient();
+  if (!supabase || !user) return [];
 
   const { data, error } = await supabase
     .from("profiles")
@@ -26,13 +25,8 @@ export async function searchPlayers(query: string): Promise<PlayerSearchResult[]
 }
 
 export async function joinLeague(formData: FormData) {
-  const supabase = createClient();
-  const { data: { user } } = await supabase.auth.getUser();
-  if (!user) redirect("/login");
-
-  // TEMPORARY DIAGNOSTIC -- remove once the RLS issue is resolved.
-  const { data: whoAmI, error: whoAmIError } = await supabase.rpc("debug_whoami");
-  console.log("DEBUG joinLeague -- getUser().id:", user.id, "| Postgres auth.uid():", whoAmI, "| rpc error:", whoAmIError);
+  const { supabase, user } = await getAuthedClient();
+  if (!supabase || !user) redirect("/login");
 
   const sport = String(formData.get("sport"));
   const format = String(formData.get("format"));
@@ -51,43 +45,26 @@ export async function joinLeague(formData: FormData) {
     const { data: profile } = await supabase.from("profiles").select("full_name").eq("id", user.id).single();
     const { data: partner } = await supabase.from("profiles").select("full_name").eq("id", partnerId!).single();
 
-    const { data: team, error: teamError } = await supabase
-      .from("teams")
-      .insert({
-        league_season_id: leagueSeasonId,
-        name: `${profile?.full_name ?? "You"} & ${partner?.full_name ?? "Partner"}`,
-        player1_id: user.id,
-        player2_id: partnerId!,
-      })
-      .select("id")
-      .single();
+    const { data: teamId, error: teamError } = await supabase.rpc("create_team", {
+      p_league_season_id: leagueSeasonId,
+      p_name: `${profile?.full_name ?? "You"} & ${partner?.full_name ?? "Partner"}`,
+      p_player1_id: user.id,
+      p_player2_id: partnerId!,
+    });
     if (teamError) throw teamError;
-    entrantId = team.id;
+    entrantId = teamId as string;
   } else {
     entrantId = user.id;
   }
 
-  // TEMPORARY DIAGNOSTIC -- full session snapshot right before the insert.
-  const { data: sessionInfo, error: sessionInfoError } = await supabase.rpc("debug_session_info");
-  console.log("DEBUG joinLeague -- full session info:", JSON.stringify(sessionInfo), "| rpc error:", sessionInfoError);
-
-  const insertPayload = {
-    league_season_id: leagueSeasonId,
-    player_id: format === "doubles" ? null : user.id,
-    team_id: format === "doubles" ? entrantId : null,
-    // Real Stripe checkout is a follow-up integration -- nothing in the UI
-    // gates on `paid` yet, so this stays false rather than faking a payment.
-    paid: false,
-  };
-  console.log("DEBUG joinLeague -- exact insert payload:", JSON.stringify(insertPayload), "| format value:", JSON.stringify(format), "| typeof format:", typeof format);
-
-  const { data: enrollment, error: enrollError } = await supabase
-    .from("enrollments")
-    .insert(insertPayload)
-    .select("id")
-    .single();
+  const { data: enrollmentId, error: enrollError } = await supabase.rpc("create_enrollment", {
+    p_league_season_id: leagueSeasonId,
+    p_player_id: format === "doubles" ? null : user.id,
+    p_team_id: format === "doubles" ? entrantId : null,
+    p_paid: false,
+  });
   if (enrollError) throw enrollError;
 
   revalidatePath("/dashboard");
-  redirect(`/leagues/${enrollment.id}`);
+  redirect(`/leagues/${enrollmentId}`);
 }
