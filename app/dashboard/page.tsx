@@ -18,7 +18,7 @@ export default async function DashboardPage() {
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) redirect("/login");
 
-  const { data: profile } = await supabase.from("profiles").select("full_name").eq("id", user.id).single();
+  const { data: profile } = await supabase.from("profiles").select("full_name, is_admin").eq("id", user.id).single();
 
   // Enrollments where I'm the direct player...
   const { data: directEnrollments } = await supabase
@@ -47,6 +47,7 @@ export default async function DashboardPage() {
       <div className="flex items-center justify-between mb-2">
         <h1 className="font-display text-2xl font-bold">Welcome, {profile?.full_name ?? "player"}.</h1>
         <div className="flex items-center gap-4">
+          {profile?.is_admin && <a href="/admin" className="text-ball text-sm hover:opacity-80">Admin</a>}
           <a href="/settings" className="text-chalk-dim text-sm hover:text-chalk">Settings</a>
           <SignOutButton />
         </div>
