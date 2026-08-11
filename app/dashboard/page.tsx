@@ -46,7 +46,10 @@ export default async function DashboardPage() {
     <main className="min-h-screen p-8 max-w-2xl mx-auto">
       <div className="flex items-center justify-between mb-2">
         <h1 className="font-display text-2xl font-bold">Welcome, {profile?.full_name ?? "player"}.</h1>
-        <SignOutButton />
+        <div className="flex items-center gap-4">
+          <a href="/settings" className="text-chalk-dim text-sm hover:text-chalk">Settings</a>
+          <SignOutButton />
+        </div>
       </div>
 
       <div className="flex items-center justify-between mt-8 mb-3">
