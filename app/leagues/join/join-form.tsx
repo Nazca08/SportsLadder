@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useTransition } from "react";
-import { divisionOptions, SPORTS, LEVELS, type Format, type Division } from "@/lib/leagues/divisions";
+import { divisionOptions, SPORTS, LEVELS, AREAS, type Format, type Division } from "@/lib/leagues/divisions";
 import { joinLeague, searchPlayers, type PlayerSearchResult } from "./actions";
 
 export function JoinLeagueForm({ gender }: { gender: "male" | "female" }) {
@@ -9,6 +9,7 @@ export function JoinLeagueForm({ gender }: { gender: "male" | "female" }) {
   const [format, setFormat] = useState<Format>("singles");
   const [division, setDivision] = useState<Division | "">("");
   const [level, setLevel] = useState<(typeof LEVELS)[number]>("4.0");
+  const [area, setArea] = useState("");
 
   const [partnerQuery, setPartnerQuery] = useState("");
   const [partnerResults, setPartnerResults] = useState<PlayerSearchResult[]>([]);
@@ -39,11 +40,16 @@ export function JoinLeagueForm({ gender }: { gender: "male" | "female" }) {
 
   function handleSubmit(formData: FormData) {
     setError("");
+    if (!area) {
+      setError("Pick your area to continue.");
+      return;
+    }
     if (format === "doubles" && !partner) {
       setError("Search for and select a partner to continue.");
       return;
     }
     formData.set("division", effectiveDivision);
+    formData.set("area", area);
     if (partner) formData.set("partnerId", partner.id);
     startTransition(async () => {
       try {
@@ -94,6 +100,15 @@ export function JoinLeagueForm({ gender }: { gender: "male" | "female" }) {
         className="w-full bg-court-deep border border-white/10 rounded-lg px-2 py-2 text-sm"
       >
         {opts.map(([v, l]) => <option key={v} value={v}>{l}</option>)}
+      </select>
+
+      <select
+        value={area}
+        onChange={(e) => setArea(e.target.value)}
+        className="w-full bg-court-deep border border-white/10 rounded-lg px-2 py-2 text-sm"
+      >
+        <option value="">Area\u2026</option>
+        {AREAS.map(([code, name]) => <option key={code} value={code}>{name}</option>)}
       </select>
 
       {format === "doubles" && (
