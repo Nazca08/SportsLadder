@@ -79,3 +79,4 @@ challenges scoped to a league, score entry wired to `lib/scoring/`,
 standings, the season-ending bracket, and the annual championship. Each of
 those is a real, testable slice we can build the same way this layer was
 built -- schema first, logic tested, then the UI on top.
+
