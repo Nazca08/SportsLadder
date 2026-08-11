@@ -3,7 +3,7 @@
 import { createClient } from "@/lib/supabase/server";
 import { getMyEntrantId, getEntrantIdForUserInMatch } from "@/lib/leagues/entrants";
 import { resolveTennisMatch, type SetScore } from "@/lib/scoring/tennis";
-import { resolvePickleballMatch } from "@/lib/scoring/pickleball";
+import { resolvePickleballMatch, type GameScore } from "@/lib/scoring/pickleball";
 import { computePoints } from "@/lib/scoring/points";
 
 async function requireUser() {
@@ -97,7 +97,7 @@ export async function respondChallenge(matchId: string, accept: boolean) {
   if (error) throw error;
 }
 
-type ScorePayload = { sport: "tennis"; sets: SetScore[] } | { sport: "pickleball"; a: number; b: number };
+type ScorePayload = { sport: "tennis"; sets: SetScore[] } | { sport: "pickleball"; games: GameScore[] };
 
 /** Either side reports a score. Stays unconfirmed until the opponent confirms (see confirmScore). */
 export async function reportScore(matchId: string, payload: ScorePayload) {
@@ -112,6 +112,7 @@ export async function reportScore(matchId: string, payload: ScorePayload) {
   let scoreA: number;
   let scoreB: number;
   let winnerSide: "a" | "b";
+  let roundsPlayed: { a: number; b: number }[];
 
   if (payload.sport === "tennis") {
     const result = resolveTennisMatch(payload.sets);
@@ -119,12 +120,14 @@ export async function reportScore(matchId: string, payload: ScorePayload) {
     scoreA = result.gamesA;
     scoreB = result.gamesB;
     winnerSide = result.winnerSide;
+    roundsPlayed = result.sets;
   } else {
-    const result = resolvePickleballMatch(payload.a, payload.b);
+    const result = resolvePickleballMatch(payload.games);
     if (!result.valid) throw new Error(result.error);
     scoreA = result.scoreA;
     scoreB = result.scoreB;
     winnerSide = result.winnerSide;
+    roundsPlayed = result.games;
   }
 
   const { pointsA, pointsB } = computePoints(scoreA, scoreB);
@@ -132,7 +135,7 @@ export async function reportScore(matchId: string, payload: ScorePayload) {
 
   const { error } = await supabase.from("match_results").insert({
     match_id: matchId,
-    sets: payload.sport === "tennis" ? payload.sets : [{ a: payload.a, b: payload.b }],
+    sets: roundsPlayed,
     winner_entrant_id: winnerEntrantId,
     points_a: pointsA,
     points_b: pointsB,
