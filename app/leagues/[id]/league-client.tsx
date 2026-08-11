@@ -25,6 +25,7 @@ type MatchResult = {
   points_b: number;
   reported_by: string;
   confirmed_by: string | null;
+  reporter_entrant_id: string | null;
 };
 type StandingsRow = { entrantId: string; points: number; wins: number; losses: number };
 
@@ -294,7 +295,15 @@ function MatchesTab({ sport, matches, resultsByMatch, name, myEntrantId }: { spo
               {!result && (
                 <ScoreForm sport={sport} onSubmit={(payload) => run(() => reportScore(m.id, payload))} />
               )}
-              {result && !result.confirmed_by && (
+              {result && !result.confirmed_by && result.reporter_entrant_id === myEntrantId && (
+                <div className="flex items-center gap-3 flex-wrap">
+                  <span className="text-sm">Sent: {result.sets.map((s) => `${s.a}-${s.b}`).join(", ")}</span>
+                  <span className="text-chalk-dim text-xs">
+                    Waiting on {m.entrant_a_id === myEntrantId && m.entrant_b_id ? name(m.entrant_b_id) : name(m.entrant_a_id)} to confirm.
+                  </span>
+                </div>
+              )}
+              {result && !result.confirmed_by && result.reporter_entrant_id !== myEntrantId && (
                 <div className="flex items-center gap-3 flex-wrap">
                   <span className="text-sm">Reported: {result.sets.map((s) => `${s.a}-${s.b}`).join(", ")}</span>
                   <button onClick={() => run(() => confirmScore(m.id))} className="bg-ball text-ink font-display text-xs font-semibold rounded px-3 py-1.5">Confirm</button>
