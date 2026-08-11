@@ -63,44 +63,54 @@ function ScoreForm({
   sport: "tennis" | "pickleball";
   onSubmit: (payload: any) => void;
 }) {
-  const [sets, setSets] = useState([{ a: "", b: "" }, { a: "", b: "" }, { a: "", b: "" }]);
-  const [a, setA] = useState("");
-  const [b, setB] = useState("");
+  const [rounds, setRounds] = useState([{ a: "", b: "" }, { a: "", b: "" }]);
+  const label = sport === "tennis" ? "Set" : "Game";
 
-  if (sport === "tennis") {
-    return (
-      <div className="flex flex-wrap items-center gap-3">
-        {sets.map((s, i) => (
+  function updateRound(i: number, field: "a" | "b", value: string) {
+    setRounds((prev) => prev.map((r, idx) => (idx === i ? { ...r, [field]: value } : r)));
+  }
+  function addRound() {
+    setRounds((prev) => [...prev, { a: "", b: "" }]);
+  }
+  function removeRound(i: number) {
+    setRounds((prev) => (prev.length > 1 ? prev.filter((_, idx) => idx !== i) : prev));
+  }
+  function handleSubmit() {
+    const filled = rounds
+      .filter((r) => r.a !== "" && r.b !== "")
+      .map((r) => ({ a: Number(r.a), b: Number(r.b) }));
+    onSubmit(sport === "tennis" ? { sport: "tennis", sets: filled } : { sport: "pickleball", games: filled });
+  }
+
+  return (
+    <div>
+      <div className="flex flex-wrap items-center gap-3 mb-2">
+        {rounds.map((r, i) => (
           <div key={i} className="flex items-center gap-1">
-            <span className="text-chalk-dim text-xs">Set {i + 1}</span>
-            <input type="number" min="0" value={s.a} onChange={(e) => { const n = [...sets]; n[i] = { ...s, a: e.target.value }; setSets(n); }} className="w-12 bg-court-deep border border-white/10 rounded px-1 py-1 text-center text-sm" />
+            <span className="text-chalk-dim text-xs">{label} {i + 1}</span>
+            <input type="number" min="0" value={r.a} onChange={(e) => updateRound(i, "a", e.target.value)} className="w-12 bg-court-deep border border-white/10 rounded px-1 py-1 text-center text-sm" />
             <span className="text-chalk-dim">-</span>
-            <input type="number" min="0" value={s.b} onChange={(e) => { const n = [...sets]; n[i] = { ...s, b: e.target.value }; setSets(n); }} className="w-12 bg-court-deep border border-white/10 rounded px-1 py-1 text-center text-sm" />
+            <input type="number" min="0" value={r.b} onChange={(e) => updateRound(i, "b", e.target.value)} className="w-12 bg-court-deep border border-white/10 rounded px-1 py-1 text-center text-sm" />
+            {rounds.length > 1 && (
+              <button type="button" onClick={() => removeRound(i)} className="text-chalk-dim text-xs px-1" aria-label={`Remove ${label.toLowerCase()} ${i + 1}`}>
+                &times;
+              </button>
+            )}
           </div>
         ))}
+      </div>
+      <div className="flex items-center gap-3">
+        <button type="button" onClick={addRound} className="text-ball text-xs font-display">
+          + Add another {label.toLowerCase()}
+        </button>
         <button
           type="button"
-          onClick={() => onSubmit({ sport: "tennis", sets: sets.filter((s) => s.a !== "" && s.b !== "").map((s) => ({ a: Number(s.a), b: Number(s.b) })) })}
+          onClick={handleSubmit}
           className="bg-ball text-ink font-display text-xs font-semibold rounded px-3 py-1.5"
         >
           Submit score
         </button>
       </div>
-    );
-  }
-  return (
-    <div className="flex items-center gap-2">
-      <span className="text-chalk-dim text-xs">Game to 11</span>
-      <input type="number" min="0" value={a} onChange={(e) => setA(e.target.value)} className="w-14 bg-court-deep border border-white/10 rounded px-1 py-1 text-center text-sm" />
-      <span className="text-chalk-dim">-</span>
-      <input type="number" min="0" value={b} onChange={(e) => setB(e.target.value)} className="w-14 bg-court-deep border border-white/10 rounded px-1 py-1 text-center text-sm" />
-      <button
-        type="button"
-        onClick={() => onSubmit({ sport: "pickleball", a: Number(a), b: Number(b) })}
-        className="bg-ball text-ink font-display text-xs font-semibold rounded px-3 py-1.5"
-      >
-        Submit score
-      </button>
     </div>
   );
 }
