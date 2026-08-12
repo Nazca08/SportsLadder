@@ -94,6 +94,20 @@ export async function joinLeague(formData: FormData) {
 }
 
 /**
+ * Form-action wrapper around resumeCheckout.
+ *
+ * The enrollment id travels in the form body rather than being closed over by
+ * an inline server action. Closing over it makes Next.js encrypt the bound
+ * argument, which fails at runtime with "Cipher job failed" -- reading it back
+ * out of FormData sidesteps that machinery entirely.
+ */
+export async function resumeCheckoutFromForm(formData: FormData) {
+  const enrollmentId = String(formData.get("enrollmentId") ?? "");
+  if (!enrollmentId) throw new Error("Missing enrollment id.");
+  await resumeCheckout(enrollmentId);
+}
+
+/**
  * Restarts checkout for an enrollment that was created but never paid for --
  * the player closed the Stripe tab, or their card was declined.
  */
