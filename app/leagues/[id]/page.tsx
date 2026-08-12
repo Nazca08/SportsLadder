@@ -6,6 +6,7 @@ import { SignOutButton } from "@/components/sign-out-button";
 import { LeaveLeagueButton } from "@/components/leave-league-button";
 import { AREAS } from "@/lib/leagues/divisions";
 import { LeagueClient } from "./league-client";
+import { PaymentGate } from "./payment-gate";
 
 const areaName = (code?: string) => AREAS.find(([c]) => c === code)?.[1] ?? code;
 
@@ -17,14 +18,20 @@ function leagueLabel(t: { sport: string; format: string; division: string; level
   return `${sport} ${format} \u00b7 ${division} \u00b7 ${t.level}${area ? ` \u00b7 ${area}` : ""}`;
 }
 
-export default async function LeaguePage({ params }: { params: { id: string } }) {
+export default async function LeaguePage({
+  params,
+  searchParams,
+}: {
+  params: { id: string };
+  searchParams: { paid?: string; canceled?: string };
+}) {
   const supabase = createClient();
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) redirect("/login");
 
   const { data: enrollment } = await supabase
     .from("enrollments")
-    .select("league_season_id")
+    .select("league_season_id, paid")
     .eq("id", params.id)
     .single();
   if (!enrollment) notFound();
@@ -41,6 +48,20 @@ export default async function LeaguePage({ params }: { params: { id: string } })
   const template = Array.isArray(leagueSeason.league_templates)
     ? leagueSeason.league_templates[0]
     : leagueSeason.league_templates;
+
+  // The paywall. Everything below this point costs database queries, so gate
+  // before doing any of that work rather than after.
+  if (!enrollment.paid) {
+    return (
+      <PaymentGate
+        enrollmentId={params.id}
+        leagueLabel={template ? leagueLabel(template as any) : "League"}
+        format={(template as any)?.format ?? "singles"}
+        canceled={searchParams?.canceled === "1"}
+        justPaid={searchParams?.paid === "1"}
+      />
+    );
+  }
 
   const myEntrantId = await getMyEntrantId(supabase, leagueSeasonId, user.id);
   const entrantNames = await getEntrantNames(supabase, leagueSeasonId);
