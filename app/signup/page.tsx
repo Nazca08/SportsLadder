@@ -58,6 +58,18 @@ export default function SignupPage() {
           <p className="text-chalk-dim text-sm">
             We sent a confirmation link to {email}. Click it, then come back and log in.
           </p>
+          <a
+            href="/login"
+            className="mt-6 block w-full bg-ball text-ink font-display font-semibold rounded-lg py-3"
+          >
+            Go to log in
+          </a>
+          <a
+            href="/"
+            className="mt-3 inline-block text-chalk-dim text-xs hover:text-chalk transition-colors"
+          >
+            &larr; Back to StringLine
+          </a>
         </div>
       </main>
     );
@@ -65,8 +77,17 @@ export default function SignupPage() {
 
   return (
     <main className="min-h-screen flex items-center justify-center p-6">
-      <div className="w-full max-w-sm bg-panel border border-white/10 rounded-2xl p-8">
-        <h1 className="font-display text-2xl font-bold mb-1">STRINGLINE</h1>
+      <div className="w-full max-w-sm">
+        <a
+          href="/"
+          className="inline-block mb-4 text-chalk-dim text-xs hover:text-chalk transition-colors"
+        >
+          &larr; Back to StringLine
+        </a>
+        <div className="bg-panel border border-white/10 rounded-2xl p-8">
+        <a href="/" className="font-display text-2xl font-bold mb-1 block hover:text-ball transition-colors">
+          STRINGLINE
+        </a>
         <p className="text-chalk-dim text-sm mb-6">Create your account.</p>
         <form onSubmit={handleSignup} className="space-y-3">
           <input
@@ -110,6 +131,7 @@ export default function SignupPage() {
         <p className="text-chalk-dim text-xs mt-4">
           Already have an account? <a href="/login" className="text-ball">Log in</a>
         </p>
+        </div>
       </div>
     </main>
   );
