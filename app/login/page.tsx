@@ -24,8 +24,17 @@ export default function LoginPage() {
 
   return (
     <main className="min-h-screen flex items-center justify-center p-6">
-      <div className="w-full max-w-sm bg-panel border border-white/10 rounded-2xl p-8">
-        <h1 className="font-display text-2xl font-bold mb-1">STRINGLINE</h1>
+      <div className="w-full max-w-sm">
+        <a
+          href="/"
+          className="inline-block mb-4 text-chalk-dim text-xs hover:text-chalk transition-colors"
+        >
+          &larr; Back to StringLine
+        </a>
+        <div className="bg-panel border border-white/10 rounded-2xl p-8">
+        <a href="/" className="font-display text-2xl font-bold mb-1 block hover:text-ball transition-colors">
+          STRINGLINE
+        </a>
         <p className="text-chalk-dim text-sm mb-6">Log in.</p>
         <form onSubmit={handleLogin} className="space-y-3">
           <input
@@ -55,6 +64,7 @@ export default function LoginPage() {
         <p className="text-chalk-dim text-xs mt-4">
           No account yet? <a href="/signup" className="text-ball">Sign up</a>
         </p>
+        </div>
       </div>
     </main>
   );
