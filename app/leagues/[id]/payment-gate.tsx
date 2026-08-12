@@ -1,6 +1,7 @@
 import { resumeCheckoutFromForm } from "@/app/leagues/join/actions";
 import { formattedFeeFor } from "@/lib/payments/checkout";
 import { SignOutButton } from "@/components/sign-out-button";
+import { LeaveLeagueButton } from "@/components/leave-league-button";
 
 /**
  * Shown instead of the league when an enrollment has not been paid for.
@@ -79,6 +80,13 @@ export function PaymentGate({
         <p className="text-chalk-dim text-xs mt-4 text-center">
           Payment is handled by Stripe. Card details never touch this site.
         </p>
+
+        {/* A player who decides against paying needs a way out; without this the
+            unpaid league sits on their dashboard permanently. */}
+        <div className="mt-6 border-t border-white/10 pt-4 text-center">
+          <p className="text-chalk-dim text-xs mb-2">Changed your mind?</p>
+          <LeaveLeagueButton enrollmentId={enrollmentId} />
+        </div>
       </div>
     </main>
   );
