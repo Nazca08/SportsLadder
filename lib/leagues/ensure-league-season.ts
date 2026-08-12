@@ -5,7 +5,7 @@ const CURRENT_SEASON_NAME = "Ongoing Season";
 /**
  * Finds or creates the league_season for this exact sport/format/division/level
  * + area combo, in whatever season is currently active. `area` is one of the
- * fixed markets StringLine operates in (see lib/leagues/divisions.ts AREAS) --
+ * fixed markets RallyRank.club operates in (see lib/leagues/divisions.ts AREAS) --
  * someone in Dallas never sees someone in Raleigh's offers, challenges, or
  * standings, even at the identical sport/format/division/level.
  * Real season scheduling (four 3-month seasons a year, rollover, tournament
