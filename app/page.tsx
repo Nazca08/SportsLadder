@@ -133,7 +133,7 @@ export default async function Home() {
               </a>
             </div>
             <p className="mt-6 font-score text-xs tracking-wider text-chalk-dim">
-              LEVELS 3.0 - 4.5 / FIVE MARKETS / FOUR SEASONS A YEAR
+              LEVELS 2.0 - 4.5 / FIVE MARKETS / FOUR SEASONS A YEAR
             </p>
           </div>
 
