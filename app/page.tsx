@@ -28,6 +28,11 @@ const STEPS = [
     title: "Climb the standings",
     body: "Every confirmed match moves you. Wins, losses, and the strength of who you beat all count. Your rank updates the moment the score is confirmed.",
   },
+  {
+    n: "05",
+    title: "Compete in the tournament",
+    body: "When the season closes, the final standings set the bracket and your rank sets your seed. Win it and you are the champion of your league for that season. Then everybody starts over.",
+  },
 ];
 
 const SEASONS = [
@@ -68,7 +73,7 @@ export default async function Home() {
       <header className="sticky top-0 z-50 border-b border-chalk/10 bg-court/90 backdrop-blur">
         <nav className="mx-auto flex max-w-6xl items-center justify-between px-6 py-4">
           <span className="font-display text-xl font-bold tracking-[0.18em]">
-            STRING<span className="text-ball">LINE</span>
+            RALLY<span className="text-ball">RANK</span><span className="text-chalk-dim">.club</span>
           </span>
           <div className="flex items-center gap-2">
             <a
@@ -109,7 +114,7 @@ export default async function Home() {
               <br className="hidden sm:block" /> looking for a game.
             </h1>
             <p className="mt-6 max-w-xl text-base leading-relaxed text-chalk-dim sm:text-lg">
-              StringLine puts you in a league with players in your area, playing your
+              RallyRank.club puts you in a league with players in your area, playing your
               sport, in your division, at your rating. Post an offer, play the match,
               report the score. The standings take care of themselves.
             </p>
@@ -170,12 +175,6 @@ export default async function Home() {
                 </div>
               ))}
             </div>
-            <div className="mt-5 border-t border-chalk/10 pt-4">
-              <p className="text-xs leading-relaxed text-chalk-dim">
-                Ties break on fewest losses, then most wins, then the quality of who you
-                beat.
-              </p>
-            </div>
           </div>
         </div>
       </section>
@@ -191,7 +190,7 @@ export default async function Home() {
             {/* eslint-disable-next-line @next/next/no-img-element */}
             <img
               src="/family.jpg"
-              alt="The family that started StringLine, standing together by a lake."
+              alt="The family that started RallyRank.club, standing together by a lake."
               className="relative w-full rounded-2xl object-cover"
             />
           </div>
@@ -207,10 +206,10 @@ export default async function Home() {
             {/* ===== EDIT THE THREE PARAGRAPHS BELOW WITH YOUR REAL STORY ===== */}
             <div className="mt-6 space-y-4 text-base leading-relaxed text-chalk-dim">
               <p>
-                We are a tennis family. Between the six of us there is always somebody
-                looking for a match, and for years the hard part was never the court or
-                the time or the wanting to play. It was finding one person at the same
-                level who would actually show up.
+                We are an overly competitive pickleball and tennis family. Between the six
+                of us there is always somebody looking for a match, and for years the hard
+                part was never the court or the time or the wanting to play. It was
+                finding one person at the same level who would actually show up.
               </p>
               <p>
                 Everyone knows the pattern. You join a club and get put in a clinic. You
@@ -221,7 +220,7 @@ export default async function Home() {
               </p>
               <p>
                 So we built the thing we wanted: a real league, with real standings, where
-                the only thing you have to do is show up and play. StringLine is what
+                the only thing you have to do is show up and play. RallyRank.club is what
                 happens when a family gets tired of looking for a game.
               </p>
             </div>
@@ -238,7 +237,7 @@ export default async function Home() {
       <section className="mx-auto max-w-6xl px-6 py-20 md:py-28">
         <p className="font-score text-xs tracking-[0.22em] text-ball">HOW IT WORKS</p>
         <h2 className="mt-4 max-w-2xl font-display text-3xl font-bold leading-tight sm:text-4xl">
-          Four steps, then you are in the standings.
+          Five steps, from signing up to the season trophy.
         </h2>
 
         <div className="relative mt-14">
@@ -379,7 +378,7 @@ export default async function Home() {
       <footer className="border-t border-chalk/10">
         <div className="mx-auto flex max-w-6xl flex-col items-center justify-between gap-4 px-6 py-8 sm:flex-row">
           <span className="font-display text-sm font-bold tracking-[0.18em]">
-            STRING<span className="text-ball">LINE</span>
+            RALLY<span className="text-ball">RANK</span><span className="text-chalk-dim">.club</span>
           </span>
           <div className="flex items-center gap-5 font-score text-xs tracking-wider text-chalk-dim">
             <a href="/login" className="transition-colors hover:text-chalk">
