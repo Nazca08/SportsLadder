@@ -2,7 +2,7 @@ import type { Metadata } from "next";
 import "./globals.css";
 
 export const metadata: Metadata = {
-  title: "StringLine",
+  title: "RallyRank.club",
   description: "A ranked league for tennis and pickleball players.",
 };
 
