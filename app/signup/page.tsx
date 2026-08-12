@@ -68,7 +68,7 @@ export default function SignupPage() {
             href="/"
             className="mt-3 inline-block text-chalk-dim text-xs hover:text-chalk transition-colors"
           >
-            &larr; Back to StringLine
+            &larr; Back to RallyRank.club
           </a>
         </div>
       </main>
@@ -82,11 +82,11 @@ export default function SignupPage() {
           href="/"
           className="inline-block mb-4 text-chalk-dim text-xs hover:text-chalk transition-colors"
         >
-          &larr; Back to StringLine
+          &larr; Back to RallyRank.club
         </a>
         <div className="bg-panel border border-white/10 rounded-2xl p-8">
         <a href="/" className="font-display text-2xl font-bold mb-1 block hover:text-ball transition-colors">
-          STRINGLINE
+          RALLY<span className="text-ball">RANK</span><span className="text-chalk-dim">.club</span>
         </a>
         <p className="text-chalk-dim text-sm mb-6">Create your account.</p>
         <form onSubmit={handleSignup} className="space-y-3">
