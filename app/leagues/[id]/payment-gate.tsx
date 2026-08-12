@@ -1,4 +1,4 @@
-import { resumeCheckout } from "@/app/leagues/join/actions";
+import { resumeCheckoutFromForm } from "@/app/leagues/join/actions";
 import { formattedFeeFor } from "@/lib/payments/checkout";
 import { SignOutButton } from "@/components/sign-out-button";
 
@@ -24,10 +24,6 @@ export function PaymentGate({
 }) {
   const fee = formattedFeeFor(format);
   const isDoubles = format === "doubles";
-  const startCheckout = async () => {
-    "use server";
-    await resumeCheckout(enrollmentId);
-  };
 
   return (
     <main className="min-h-screen p-6 max-w-lg mx-auto">
@@ -70,7 +66,8 @@ export function PaymentGate({
           send challenges, and appear in the standings as soon as it clears.
         </p>
 
-        <form action={startCheckout}>
+        <form action={resumeCheckoutFromForm}>
+          <input type="hidden" name="enrollmentId" value={enrollmentId} />
           <button
             type="submit"
             className="w-full bg-ball text-ink font-display font-semibold rounded-lg py-3 hover:opacity-90 transition-opacity"
