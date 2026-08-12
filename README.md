@@ -1,82 +1,55 @@
-# StringLine
+[5_README.md](https://github.com/user-attachments/files/30989742/5_README.md)
+# RallyRank.club
 
-Real codebase for the tennis/pickleball league app -- Next.js + Supabase.
-This is the **foundational layer**: project setup, the full database schema
-with Row Level Security, the scoring/points/tiebreaker/bracket logic as
-tested code, and working signup/login. League enrollment, offers,
-challenges, and standings pages are the next build phase.
+Real, deployed codebase for a tennis/pickleball league app -- Next.js + Supabase, currently live on Vercel.
 
-## What's actually in here
+## What's actually working, live, right now
 
-- `supabase/migrations/0001_init.sql` -- the full schema: leagues, seasons,
-  enrollments, teams, matches, tournaments, annual championships, and the
-  Row Level Security policies that enforce "you only see your own league"
-  at the database level.
-- `lib/scoring/` -- the points formula, tennis/pickleball validation,
-  standings tiebreaker, and annual championship substitution logic, each
-  with unit tests (`npm test`). This is meant to be the one place that
-  logic lives, shared by the website today and a native app later.
-- `app/` -- signup, login, and a placeholder dashboard proving auth works
-  end-to-end against Supabase.
+- Signup/login with real Supabase auth (email confirmation supported)
+- Join a league: sport, singles/doubles, division, level, and a fixed 5-area picker (Dallas TX, Utah Valley UT, Palmas Del Mar PR, Minneapolis MN, Raleigh NC)
+- Doubles partner search (partner must already have an account)
+- Offers (post/accept), challenges (send/accept/decline), each scoped strictly to your league
+- Score reporting with two-sided confirmation (reporter can't confirm their own score) or dispute
+- Flexible scoring: any number of sets (tennis) or games (pickleball), winner by majority, not locked to best-of-3 or a single game
+- Live standings with a real tiebreaker (fewest losses, then most wins, then best win by opponent standing)
+- Settings page: profile info, optional team/display name, phone, photo upload (Supabase Storage), email/password change, and a cross-league stats breakdown (overall record, by opponent level, head-to-head)
+- Leave a league
+- Admin panel (`dynexdynastyadmin@gmail.com`, auto-granted on signup): view/resolve every disputed or unscored match across every league, set final scores directly
+- Player avatars and league rank shown next to names in offers and challenges
 
-## 1. Create the Supabase project
+## Not built yet
 
-1. In your Supabase dashboard, create a new project.
-2. Go to the **SQL Editor**, paste in the entire contents of
-   `supabase/migrations/0001_init.sql`, and run it. This creates every
-   table and turns on Row Level Security.
-3. Go to **Project Settings -> API**. You'll need two values from here in
-   a minute: the **Project URL** and the **anon public key**.
+- Season-ending tournament brackets and the annual championship -- the seeding/bye/substitution logic is written and unit-tested in `lib/scoring/`, but nothing calls it or writes to `tournaments`/`tournament_matches`/`annual_championships` yet
+- Real season scheduling (four 3-month seasons/year, rollover) -- everyone is currently in one continuously-running "Ongoing Season"
+- Real payments -- `enrollments.paid` exists but nothing gates on it; no Stripe integration
+- Native mobile app -- website only so far
 
-## 2. Set up your local environment
+## Project structure
+
+- `supabase/migrations/0001` through `0008` -- run these in order in a fresh Supabase project's SQL Editor. Each is idempotent-safe to re-run.
+- `lib/scoring/` -- points formula, tennis/pickleball validation, standings tiebreaker, bracket seeding, annual championship substitution logic. All covered by `lib/scoring/scoring.test.ts` (22 tests, run with `npm test`).
+- `lib/leagues/` -- league template matching, entrant name/avatar resolution, standings computation, player stats.
+- `lib/supabase/` -- three client variants: `server.ts` (cookie-based SSR client, used in Server Components), `client.ts` (browser client, used for Settings page writes), `admin.ts` (service-role client, bypasses RLS, used for structural writes like league templates), `authed-client.ts` (explicit-Authorization-header client -- see "Known issue" below).
+- `app/leagues/join/` -- the league-joining flow.
+- `app/leagues/[id]/` -- the league hub: rankings, offers, challenges, matches.
+- `app/settings/` -- profile, avatar, account, stats.
+- `app/admin/` -- admin-only match resolution panel.
+
+## Setup (fresh Supabase project)
 
 ```bash
-cp .env.example .env.local
-```
-
-Open `.env.local` and fill in the two values from Supabase step 3 above.
-`.env.local` is already in `.gitignore` -- it will never get pushed to
-GitHub.
-
-```bash
+cp .env.example .env.local   # fill in your Supabase URL + anon key + service role key
 npm install
-npm test        # confirms the scoring logic passes (17 tests)
-npm run dev      # runs locally at http://localhost:3000
+npm test                      # 22 tests should pass
+npm run dev
 ```
 
-Try signing up at `/signup` -- it should create a real account and land
-you on `/dashboard`.
+Run all 8 files in `supabase/migrations/` in order via Supabase's SQL Editor before testing signup.
 
-## 3. Push to GitHub
+## An important known issue (already worked around, but worth understanding)
 
-```bash
-git init
-git add .
-git commit -m "Initial StringLine scaffold"
-git branch -M main
-git remote add origin https://github.com/YOUR-USERNAME/stringline.git
-git push -u origin main
-```
+Early on, direct `.insert()` calls through the normal cookie-based SSR client (`lib/supabase/server.ts`) intermittently failed RLS checks on the `enrollments` table, even though extensive diagnostics (matching `auth.uid()`, correct JWT, correct role, and a raw SQL reproduction using the exact same values) all showed the write *should* have succeeded. The root cause was never conclusively identified.
 
-(Create the empty repo on GitHub first, then use its URL in place of
-`YOUR-USERNAME/stringline` above.)
+The workaround, used for the join-league and leave-league flows: `.rpc()` calls have been 100% reliable throughout, so those two flows use security-definer Postgres functions (`create_enrollment`, `create_team`, `leave_league`) called via `lib/supabase/authed-client.ts` (a client with the access token attached explicitly), rather than raw table inserts. If you add new user-facing writes and hit the same mysterious RLS failure, this is the pattern to reach for.
 
-## 4. Deploy on Vercel
-
-1. In Vercel, "Add New Project" and import the GitHub repo you just pushed.
-2. Vercel will detect it's a Next.js project automatically.
-3. Before deploying, add the same two environment variables from step 1
-   (`NEXT_PUBLIC_SUPABASE_URL`, `NEXT_PUBLIC_SUPABASE_ANON_KEY`) under
-   the project's **Settings -> Environment Variables**.
-4. Deploy. From here on, every push to `main` on GitHub redeploys
-   automatically.
-
-## What's next
-
-The build plan (from our earlier design conversation) is the roadmap:
-league enrollment and the sport/format/division/level picker, offers and
-challenges scoped to a league, score entry wired to `lib/scoring/`,
-standings, the season-ending bracket, and the annual championship. Each of
-those is a real, testable slice we can build the same way this layer was
-built -- schema first, logic tested, then the UI on top.
-
+Everything else (offers, challenges, score reporting/confirmation, settings updates) uses plain `.insert()`/`.update()` through the normal clients and has worked without issue.
