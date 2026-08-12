@@ -13,7 +13,7 @@ export function divisionOptions(gender: Gender, format: Format): [Division, stri
 }
 
 export const SPORTS = ["tennis", "pickleball"] as const;
-export const LEVELS = ["3.0", "3.5", "4.0", "4.5"] as const;
+export const LEVELS = ["2.0", "2.5", "3.0", "3.5", "4.0", "4.5"] as const;
 
 /** The only markets RallyRank.club currently operates in. */
 export const AREAS: [string, string][] = [
