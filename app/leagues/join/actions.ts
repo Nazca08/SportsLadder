@@ -4,6 +4,17 @@ import { redirect } from "next/navigation";
 import { revalidatePath } from "next/cache";
 import { getAuthedClient } from "@/lib/supabase/authed-client";
 import { ensureLeagueSeason } from "@/lib/leagues/ensure-league-season";
+import { createCheckoutUrl } from "@/lib/payments/checkout";
+import { AREAS } from "@/lib/leagues/divisions";
+
+/** Human-readable league name, used as the Stripe line item description. */
+function describeLeague(sport: string, format: string, division: string, level: string, area: string) {
+  const s = sport === "tennis" ? "Tennis" : "Pickleball";
+  const f = format === "doubles" ? "Doubles" : "Singles";
+  const d = division === "mixed" ? "Mixed" : division === "mens" ? "Men's" : "Women's";
+  const a = AREAS.find(([code]) => code === area)?.[1] ?? area;
+  return `${s} ${f} \u00b7 ${d} \u00b7 ${level} \u00b7 ${a}`;
+}
 
 export type PlayerSearchResult = { id: string; full_name: string };
 
@@ -70,5 +81,47 @@ export async function joinLeague(formData: FormData) {
   if (enrollError) throw enrollError;
 
   revalidatePath("/dashboard");
-  redirect(`/leagues/${enrollmentId}`);
+
+  // The enrollment exists but is unpaid, so it grants no access yet. Send the
+  // player to Stripe; the webhook flips `paid` when the payment clears.
+  const checkoutUrl = await createCheckoutUrl(
+    enrollmentId as string,
+    format,
+    describeLeague(sport, format, division, level, area),
+    user.email ?? undefined
+  );
+  redirect(checkoutUrl);
+}
+
+/**
+ * Restarts checkout for an enrollment that was created but never paid for --
+ * the player closed the Stripe tab, or their card was declined.
+ */
+export async function resumeCheckout(enrollmentId: string) {
+  const { supabase, user } = await getAuthedClient();
+  if (!supabase || !user) redirect("/login");
+
+  // RLS on enrollments limits this to the caller's own rows, so a player cannot
+  // start a checkout for somebody else's enrollment.
+  const { data: enrollment } = await supabase
+    .from("enrollments")
+    .select("id, paid, league_seasons(league_templates(sport, format, division, level, area))")
+    .eq("id", enrollmentId)
+    .single();
+
+  if (!enrollment) throw new Error("Enrollment not found.");
+  if (enrollment.paid) redirect(`/leagues/${enrollmentId}`);
+
+  const ls: any = Array.isArray(enrollment.league_seasons)
+    ? enrollment.league_seasons[0]
+    : enrollment.league_seasons;
+  const t: any = Array.isArray(ls?.league_templates) ? ls.league_templates[0] : ls?.league_templates;
+
+  const checkoutUrl = await createCheckoutUrl(
+    enrollmentId,
+    t?.format ?? "singles",
+    t ? describeLeague(t.sport, t.format, t.division, t.level, t.area) : "League entry",
+    user.email ?? undefined
+  );
+  redirect(checkoutUrl);
 }
