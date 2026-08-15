@@ -62,6 +62,10 @@ export async function createCheckoutUrl(
   const session = await stripe.checkout.sessions.create({
     mode: "payment",
     customer_email: customerEmail,
+    // Shows a "promotion code" field on the Stripe page. Codes themselves are
+    // created and expired in the Stripe dashboard, not here, so running a
+    // promotion never needs a code change.
+    allow_promotion_codes: true,
     line_items: [
       {
         quantity: 1,
