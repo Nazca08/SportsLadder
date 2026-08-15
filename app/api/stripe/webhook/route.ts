@@ -55,7 +55,14 @@ export async function POST(req: Request) {
     return new Response("No enrollment_id in metadata.", { status: 200 });
   }
 
-  if (session.payment_status !== "paid") {
+  // A 100% off promotion code produces a zero-dollar session, and Stripe
+  // reports those as "no_payment_required" rather than "paid" -- there was no
+  // payment to make. Treating only "paid" as success would silently lock out
+  // every player who used a free code.
+  if (
+    session.payment_status !== "paid" &&
+    session.payment_status !== "no_payment_required"
+  ) {
     return new Response("Session not paid.", { status: 200 });
   }
 
