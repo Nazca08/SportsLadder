@@ -1,6 +1,6 @@
 import { redirect, notFound } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
-import { getMyEntrantId, getEntrantNames, getEntrantAvatars, getEntrantIdForUserInMatch } from "@/lib/leagues/entrants";
+import { getMyEntrantId, getEntrantNames, getEntrantAvatars, getEntrantRatings, getEntrantIdForUserInMatch } from "@/lib/leagues/entrants";
 import { computeLeagueStandings } from "@/lib/leagues/standings";
 import { SignOutButton } from "@/components/sign-out-button";
 import { LeaveLeagueButton } from "@/components/leave-league-button";
@@ -60,6 +60,7 @@ export default async function LeaguePage({
   const myEntrantId = await getMyEntrantId(supabase, leagueSeasonId, user.id);
   const entrantNames = await getEntrantNames(supabase, leagueSeasonId);
   const entrantAvatars = await getEntrantAvatars(supabase, leagueSeasonId);
+  const entrantRatings = await getEntrantRatings(supabase, leagueSeasonId);
   const standings = await computeLeagueStandings(supabase, leagueSeasonId);
 
   const { data: allMatches } = await supabase
@@ -108,6 +109,8 @@ export default async function LeaguePage({
         myEntrantId={myEntrantId}
         entrantNames={Object.fromEntries(entrantNames)}
         entrantAvatars={Object.fromEntries(entrantAvatars)}
+        entrantRatings={Object.fromEntries(entrantRatings)}
+        showRatings={(template as any)?.level === "open"}
         standings={standings}
         matches={matches}
         resultsByMatch={Object.fromEntries(resultsByMatch)}
