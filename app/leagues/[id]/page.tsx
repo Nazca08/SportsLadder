@@ -7,16 +7,10 @@ import { LeaveLeagueButton } from "@/components/leave-league-button";
 import { AREAS } from "@/lib/leagues/divisions";
 import { LeagueClient } from "./league-client";
 import { PaymentGate } from "./payment-gate";
+import { leagueLabel } from "@/lib/leagues/label";
 
 const areaName = (code?: string) => AREAS.find(([c]) => c === code)?.[1] ?? code;
 
-function leagueLabel(t: { sport: string; format: string; division: string; level: string; area?: string }) {
-  const sport = t.sport === "tennis" ? "Tennis" : "Pickleball";
-  const format = t.format === "doubles" ? "Doubles" : "Singles";
-  const division = t.division === "mixed" ? "Mixed" : t.division === "mens" ? "Men's" : "Women's";
-  const area = areaName(t.area);
-  return `${sport} ${format} \u00b7 ${division} \u00b7 ${t.level}${area ? ` \u00b7 ${area}` : ""}`;
-}
 
 export default async function LeaguePage({
   params,
@@ -40,7 +34,7 @@ export default async function LeaguePage({
 
   const { data: leagueSeason } = await supabase
     .from("league_seasons")
-    .select("id, league_templates(sport, format, division, level, area)")
+    .select("id, league_templates(sport, format, division, level, area, name)")
     .eq("id", leagueSeasonId)
     .single();
   if (!leagueSeason) notFound();
