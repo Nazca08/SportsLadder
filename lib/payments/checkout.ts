@@ -62,7 +62,8 @@ export async function createCheckoutUrl(
   enrollmentId: string,
   format: string,
   leagueLabel: string,
-  customerEmail?: string
+  customerEmail?: string,
+  playerId?: string
 ): Promise<string> {
   const stripe = stripeClient();
   const base = siteUrl();
@@ -101,11 +102,16 @@ export async function createCheckoutUrl(
   // at 'pending' forever means someone started checkout and walked away, which
   // is useful to be able to see.
   const admin = createAdminClient();
+  // player_id and league_label are snapshots. A player can leave a league they
+  // paid for, which nulls enrollment_id -- these keep the payment record
+  // answerable on its own afterwards.
   await admin.from("payments").insert({
     enrollment_id: enrollmentId,
     stripe_session_id: session.id,
     amount_cents: amountCents,
     status: "pending",
+    player_id: playerId ?? null,
+    league_label: leagueLabel,
   });
 
   return session.url;
