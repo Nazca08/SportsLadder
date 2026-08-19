@@ -94,3 +94,24 @@ export async function getEntrantIdForUserInMatch(
 
   return team ? team.id : null;
 }
+
+/**
+ * Self-reported rating per entrant, for leagues that mix ratings in one ladder.
+ * Singles only by design: a doubles team has two ratings and no single number
+ * that honestly describes it, and open leagues are currently singles anyway.
+ */
+export async function getEntrantRatings(
+  supabase: SupabaseClient,
+  leagueSeasonId: string
+): Promise<Map<string, string | null>> {
+  const { data: enrollments } = await supabase
+    .from("enrollments")
+    .select("player_id")
+    .eq("league_season_id", leagueSeasonId);
+
+  const playerIds = (enrollments ?? []).map((e) => e.player_id).filter(Boolean) as string[];
+  if (playerIds.length === 0) return new Map();
+
+  const { data: profiles } = await supabase.from("profiles").select("id, rating").in("id", playerIds);
+  return new Map((profiles ?? []).map((p) => [p.id, (p as any).rating ?? null]));
+}
