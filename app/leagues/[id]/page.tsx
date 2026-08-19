@@ -7,7 +7,7 @@ import { LeaveLeagueButton } from "@/components/leave-league-button";
 import { AREAS } from "@/lib/leagues/divisions";
 import { LeagueClient } from "./league-client";
 import { PaymentGate } from "./payment-gate";
-import { leagueLabel } from "@/lib/leagues/label";
+import { leagueLabel, areaShortName } from "@/lib/leagues/label";
 
 const areaName = (code?: string) => AREAS.find(([c]) => c === code)?.[1] ?? code;
 
@@ -103,6 +103,7 @@ export default async function LeaguePage({
       </div>
       <LeagueClient
         leagueSeasonId={leagueSeasonId}
+        defaultLocation={areaShortName((template as any)?.area) || "TBD"}
         sport={(template as any)?.sport ?? "tennis"}
         myEntrantId={myEntrantId}
         entrantNames={Object.fromEntries(entrantNames)}
