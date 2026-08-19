@@ -13,34 +13,39 @@ export function LeaveLeagueButton({ enrollmentId }: { enrollmentId: string }) {
   function handleLeave() {
     setError("");
     startTransition(async () => {
-      try {
-        await leaveLeague(enrollmentId);
-        router.push("/dashboard");
-      } catch (e) {
-        setError(e instanceof Error ? e.message : "Something went wrong.");
+      const result = await leaveLeague(enrollmentId);
+      if (result?.error) {
+        setError(result.error);
         setConfirming(false);
+        return;
       }
+      router.push("/dashboard");
     });
   }
 
-  if (confirming) {
-    return (
-      <span className="flex items-center gap-2 text-xs">
-        <span className="text-paddle">Leave this league?</span>
-        <button onClick={handleLeave} disabled={pending} className="text-paddle underline">
-          {pending ? "Leaving\u2026" : "Confirm"}
-        </button>
-        <button onClick={() => setConfirming(false)} className="text-chalk-dim underline">Cancel</button>
-      </span>
-    );
-  }
-
   return (
-    <span>
-      <button onClick={() => setConfirming(true)} className="text-chalk-dim text-sm hover:text-paddle">
-        Leave league
-      </button>
-      {error && <div className="text-paddle text-xs mt-1">{error}</div>}
+    // Column layout with a width cap: the old version let a long error string
+    // stretch across the header and shove the surrounding links out of place.
+    <span className="inline-flex flex-col items-start gap-1 max-w-xs">
+      {confirming ? (
+        <span className="flex items-center gap-2 text-xs">
+          <span className="text-paddle">Leave this league?</span>
+          <button onClick={handleLeave} disabled={pending} className="text-paddle underline">
+            {pending ? "Leaving…" : "Confirm"}
+          </button>
+          <button onClick={() => setConfirming(false)} className="text-chalk-dim underline">
+            Cancel
+          </button>
+        </span>
+      ) : (
+        <button
+          onClick={() => setConfirming(true)}
+          className="text-chalk-dim text-sm hover:text-paddle"
+        >
+          Leave league
+        </button>
+      )}
+      {error && <span className="text-paddle text-xs leading-snug">{error}</span>}
     </span>
   );
 }
