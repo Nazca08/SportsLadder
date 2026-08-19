@@ -8,6 +8,15 @@ import { createAdminClient } from "@/lib/supabase/admin";
  * per team, so the pair pays this once between them. Charging each player
  * separately would be a schema change, not a price change.
  */
+/**
+ * The launch promotion. This is display only -- the discount itself lives in
+ * the Stripe dashboard as a promotion code attached to a 100%-off coupon.
+ * Changing this string changes what the site advertises, NOT what Stripe
+ * accepts, so the two have to be kept in step by hand.
+ */
+export const PROMO_CODE = "FREE2026";
+export const PROMO_BLURB = "free through the end of 2026";
+
 export const SINGLES_FEE_CENTS = 2500;
 export const DOUBLES_TEAM_FEE_CENTS = 3500;
 
