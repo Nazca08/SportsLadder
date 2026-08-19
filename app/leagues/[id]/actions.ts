@@ -116,7 +116,19 @@ export async function reportScore(matchId: string, payload: ScorePayload) {
   let roundsPlayed: { a: number; b: number }[];
 
   if (payload.sport === "tennis") {
-    const result = resolveTennisMatch(payload.sets);
+    // Taken from the league, not the payload: the client must not get to
+    // choose which rules its score is validated against.
+    const { data: ls } = await supabase
+      .from("league_seasons")
+      .select("league_templates(scoring_format)")
+      .eq("id", match.league_season_id)
+      .single();
+    const tpl: any = Array.isArray((ls as any)?.league_templates)
+      ? (ls as any).league_templates[0]
+      : (ls as any)?.league_templates;
+    const format = (tpl?.scoring_format ?? "standard") as "standard" | "single_set";
+
+    const result = resolveTennisMatch(payload.sets, format);
     if (!result.valid) throw new Error(result.error);
     scoreA = result.gamesA;
     scoreB = result.gamesB;
