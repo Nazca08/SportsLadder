@@ -29,6 +29,16 @@ type MatchResult = {
 };
 type StandingsRow = { entrantId: string; points: number; wins: number; losses: number };
 
+/** Rating chip shown beside a name in open leagues. */
+function RatingBadge({ rating }: { rating: string | null }) {
+  if (!rating) return null;
+  return (
+    <span className="ml-2 font-score text-[10px] tracking-wide text-ball border border-ball/40 rounded px-1.5 py-0.5 align-middle">
+      {rating}
+    </span>
+  );
+}
+
 /**
  * Match location, defaulting to the league's home area.
  *
@@ -79,6 +89,8 @@ function LocationField({ defaultLocation }: { defaultLocation: string }) {
 type Props = {
   leagueSeasonId: string;
   defaultLocation: string;
+  entrantRatings: Record<string, string | null>;
+  showRatings: boolean;
   sport: "tennis" | "pickleball";
   myEntrantId: string | null;
   entrantNames: Record<string, string>;
@@ -181,7 +193,9 @@ function ScoreForm({
   );
 }
 
-export function LeagueClient({ leagueSeasonId, sport, myEntrantId, entrantNames, entrantAvatars, standings, matches, resultsByMatch, defaultLocation }: Props) {
+export function LeagueClient({ leagueSeasonId, sport, myEntrantId, entrantNames, entrantAvatars, standings, matches, resultsByMatch, defaultLocation, entrantRatings, showRatings }: Props) {
+  /** Rating badge text for an entrant, or null when this league does not use them. */
+  const ratingOf = (id: string) => (showRatings ? entrantRatings[id] ?? null : null);
   const [tab, setTab] = useState<"rankings" | "offers" | "challenges" | "matches">("rankings");
   const name = (id: string) => entrantNames[id] ?? "Unknown";
   const rank = (id: string): number | null => {
@@ -199,15 +213,15 @@ export function LeagueClient({ leagueSeasonId, sport, myEntrantId, entrantNames,
         ))}
       </div>
 
-      {tab === "rankings" && <RankingsTab standings={standings} name={name} myEntrantId={myEntrantId} />}
-      {tab === "offers" && <OffersTab leagueSeasonId={leagueSeasonId} matches={matches} name={name} avatar={(id: string) => entrantAvatars[id] ?? null} rank={rank} myEntrantId={myEntrantId} defaultLocation={defaultLocation} />}
-      {tab === "challenges" && <ChallengesTab leagueSeasonId={leagueSeasonId} matches={matches} standings={standings} name={name} avatar={(id: string) => entrantAvatars[id] ?? null} rank={rank} myEntrantId={myEntrantId} defaultLocation={defaultLocation} />}
+      {tab === "rankings" && <RankingsTab standings={standings} name={name} myEntrantId={myEntrantId} ratingOf={ratingOf} />}
+      {tab === "offers" && <OffersTab leagueSeasonId={leagueSeasonId} matches={matches} name={name} avatar={(id: string) => entrantAvatars[id] ?? null} rank={rank} myEntrantId={myEntrantId} defaultLocation={defaultLocation} ratingOf={ratingOf} />}
+      {tab === "challenges" && <ChallengesTab leagueSeasonId={leagueSeasonId} matches={matches} standings={standings} name={name} avatar={(id: string) => entrantAvatars[id] ?? null} rank={rank} myEntrantId={myEntrantId} defaultLocation={defaultLocation} ratingOf={ratingOf} />}
       {tab === "matches" && <MatchesTab sport={sport} matches={matches} resultsByMatch={resultsByMatch} name={name} myEntrantId={myEntrantId} />}
     </div>
   );
 }
 
-function RankingsTab({ standings, name, myEntrantId }: { standings: StandingsRow[]; name: (id: string) => string; myEntrantId: string | null }) {
+function RankingsTab({ standings, name, myEntrantId, ratingOf }: { standings: StandingsRow[]; name: (id: string) => string; myEntrantId: string | null; ratingOf: (id: string) => string | null }) {
   return (
     <div className="space-y-2">
       {standings.length === 0 && <p className="text-chalk-dim text-sm">No one enrolled yet.</p>}
@@ -216,7 +230,9 @@ function RankingsTab({ standings, name, myEntrantId }: { standings: StandingsRow
           <span className="font-score text-chalk-dim w-6 text-center">{i + 1}</span>
           <div className="flex-1">
             <div className="text-chalk font-medium">
-              {name(row.entrantId)} {row.entrantId === myEntrantId && <span className="text-ball text-xs font-display ml-1">YOU</span>}
+              {name(row.entrantId)}
+              <RatingBadge rating={ratingOf(row.entrantId)} />
+              {row.entrantId === myEntrantId && <span className="text-ball text-xs font-display ml-1">YOU</span>}
             </div>
             <div className="text-chalk-dim text-xs">{row.wins}-{row.losses}</div>
           </div>
@@ -227,7 +243,7 @@ function RankingsTab({ standings, name, myEntrantId }: { standings: StandingsRow
   );
 }
 
-function OffersTab({ leagueSeasonId, matches, name, avatar, rank, myEntrantId, defaultLocation }: { leagueSeasonId: string; matches: Match[]; name: (id: string) => string; avatar: (id: string) => string | null; rank: (id: string) => number | null; myEntrantId: string | null; defaultLocation: string }) {
+function OffersTab({ leagueSeasonId, matches, name, avatar, rank, myEntrantId, defaultLocation, ratingOf }: { leagueSeasonId: string; matches: Match[]; name: (id: string) => string; avatar: (id: string) => string | null; rank: (id: string) => number | null; myEntrantId: string | null; defaultLocation: string; ratingOf: (id: string) => string | null }) {
   const { run, pending, error } = useAction();
   const [showForm, setShowForm] = useState(false);
   const [collapsed, setCollapsed] = useState(false);
@@ -280,6 +296,7 @@ function OffersTab({ leagueSeasonId, matches, name, avatar, rank, myEntrantId, d
             <div className="flex-1 text-sm">
               {name(m.entrant_a_id)}
               {rank(m.entrant_a_id) && <span className="text-ball text-xs font-score ml-1.5">#{rank(m.entrant_a_id)}</span>}
+              <RatingBadge rating={ratingOf(m.entrant_a_id)} />
               {" "}&middot; {m.scheduled_date} {m.scheduled_time} &middot; {m.location}
             </div>
             <button onClick={() => run(() => acceptOffer(m.id))} className="bg-ball text-ink font-display text-xs font-semibold rounded-lg px-3 py-1.5">Accept</button>
@@ -290,7 +307,7 @@ function OffersTab({ leagueSeasonId, matches, name, avatar, rank, myEntrantId, d
   );
 }
 
-function ChallengesTab({ leagueSeasonId, matches, standings, name, avatar, rank, myEntrantId, defaultLocation }: { leagueSeasonId: string; matches: Match[]; standings: StandingsRow[]; name: (id: string) => string; avatar: (id: string) => string | null; rank: (id: string) => number | null; myEntrantId: string | null; defaultLocation: string }) {
+function ChallengesTab({ leagueSeasonId, matches, standings, name, avatar, rank, myEntrantId, defaultLocation, ratingOf }: { leagueSeasonId: string; matches: Match[]; standings: StandingsRow[]; name: (id: string) => string; avatar: (id: string) => string | null; rank: (id: string) => number | null; myEntrantId: string | null; defaultLocation: string; ratingOf: (id: string) => string | null }) {
   const { run, pending, error } = useAction();
   const [opponentId, setOpponentId] = useState("");
 
@@ -310,7 +327,10 @@ function ChallengesTab({ leagueSeasonId, matches, standings, name, avatar, rank,
           <select value={opponentId} onChange={(e) => setOpponentId(e.target.value)} className="bg-panel border border-white/10 rounded-lg px-2 py-2 text-sm">
             <option value="" disabled>Choose an opponent…</option>
             {standings.filter((s) => s.entrantId !== myEntrantId).map((s) => (
-              <option key={s.entrantId} value={s.entrantId}>#{rank(s.entrantId)} {name(s.entrantId)}</option>
+              <option key={s.entrantId} value={s.entrantId}>
+                #{rank(s.entrantId)} {name(s.entrantId)}
+                {ratingOf(s.entrantId) ? ` · ${ratingOf(s.entrantId)}` : ""}
+              </option>
             ))}
           </select>
           <input name="date" type="date" required className="bg-panel border border-white/10 rounded-lg px-2 py-2 text-sm" />
@@ -330,6 +350,7 @@ function ChallengesTab({ leagueSeasonId, matches, standings, name, avatar, rank,
             <div className="flex-1 text-sm">
               {name(m.entrant_a_id)}
               {rank(m.entrant_a_id) && <span className="text-ball text-xs font-score ml-1.5">#{rank(m.entrant_a_id)}</span>}
+              <RatingBadge rating={ratingOf(m.entrant_a_id)} />
               {" "}challenged you &middot; {m.scheduled_date} {m.scheduled_time}
             </div>
             <button onClick={() => run(() => respondChallenge(m.id, true))} className="bg-ball text-ink rounded-lg px-3 py-1.5 text-xs font-display font-semibold">Accept</button>
