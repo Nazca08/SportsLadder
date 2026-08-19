@@ -189,10 +189,18 @@ export async function disputeScore(matchId: string) {
 }
 
 /** Leaves a league. For a doubles enrollment, this removes the whole team's spot -- see leave_league() for the ownership check. */
-export async function leaveLeague(enrollmentId: string) {
+export async function leaveLeague(enrollmentId: string): Promise<{ error?: string }> {
   const { supabase, user } = await getAuthedClient();
-  if (!supabase || !user) throw new Error("Not signed in.");
+  if (!supabase || !user) return { error: "You are not signed in." };
 
   const { error } = await supabase.rpc("leave_league", { p_enrollment_id: enrollmentId });
-  if (error) throw error;
+
+  // Returned rather than thrown on purpose. Next.js replaces the text of any
+  // error thrown from a server action with a generic "message is omitted in
+  // production builds" notice, which hides exactly the detail the player and
+  // the developer need -- for instance leave_league's own "This league has been
+  // paid for" refusal. Returning it keeps the real message intact.
+  if (error) return { error: error.message };
+
+  return {};
 }
