@@ -3,18 +3,10 @@
 import { redirect } from "next/navigation";
 import { revalidatePath } from "next/cache";
 import { getAuthedClient } from "@/lib/supabase/authed-client";
-import { ensureLeagueSeason } from "@/lib/leagues/ensure-league-season";
+import { ensureLeagueSeason, ensureLeagueSeasonForTemplate } from "@/lib/leagues/ensure-league-season";
 import { createCheckoutUrl } from "@/lib/payments/checkout";
-import { AREAS } from "@/lib/leagues/divisions";
+import { leagueLabel } from "@/lib/leagues/label";
 
-/** Human-readable league name, used as the Stripe line item description. */
-function describeLeague(sport: string, format: string, division: string, level: string, area: string) {
-  const s = sport === "tennis" ? "Tennis" : "Pickleball";
-  const f = format === "doubles" ? "Doubles" : "Singles";
-  const d = division === "mixed" ? "Mixed" : division === "mens" ? "Men's" : "Women's";
-  const a = AREAS.find(([code]) => code === area)?.[1] ?? area;
-  return `${s} ${f} \u00b7 ${d} \u00b7 ${level} \u00b7 ${a}`;
-}
 
 export type PlayerSearchResult = { id: string; full_name: string };
 
@@ -39,21 +31,59 @@ export async function joinLeague(formData: FormData) {
   const { supabase, user } = await getAuthedClient();
   if (!supabase || !user) redirect("/login");
 
-  const sport = String(formData.get("sport"));
-  const format = String(formData.get("format"));
-  const division = String(formData.get("division"));
-  const level = String(formData.get("level"));
-  const area = String(formData.get("area"));
   const partnerId = formData.get("partnerId") ? String(formData.get("partnerId")) : null;
 
-  if (!area) {
-    throw new Error("Pick your area to continue.");
-  }
-  if (format === "doubles" && !partnerId) {
-    throw new Error("Pick a partner to join a doubles league.");
-  }
+  // A named club league is picked whole, so its sport/format/etc come from the
+  // stored row rather than from dropdowns the player never saw.
+  const clubTemplateId = formData.get("clubTemplateId")
+    ? String(formData.get("clubTemplateId"))
+    : null;
 
-  const leagueSeasonId = await ensureLeagueSeason(sport, format, division, level, area);
+  let sport: string;
+  let format: string;
+  let division: string;
+  let level: string;
+  let area: string;
+  let template: Record<string, any> | null = null;
+  let leagueSeasonId: string;
+
+  if (clubTemplateId) {
+    const { data: row } = await supabase
+      .from("league_templates")
+      .select("sport, format, division, level, area, name")
+      .eq("id", clubTemplateId)
+      .single();
+    if (!row) throw new Error("That league no longer exists.");
+
+    template = row;
+    sport = String(row.sport);
+    format = String(row.format);
+    division = String(row.division);
+    level = String(row.level);
+    area = String(row.area);
+
+    if (format === "doubles" && !partnerId) {
+      throw new Error("Pick a partner to join a doubles league.");
+    }
+
+    leagueSeasonId = await ensureLeagueSeasonForTemplate(clubTemplateId);
+  } else {
+    sport = String(formData.get("sport"));
+    format = String(formData.get("format"));
+    division = String(formData.get("division"));
+    level = String(formData.get("level"));
+    area = String(formData.get("area"));
+
+    if (!area) {
+      throw new Error("Pick your area to continue.");
+    }
+    if (format === "doubles" && !partnerId) {
+      throw new Error("Pick a partner to join a doubles league.");
+    }
+
+    template = { sport, format, division, level, area, name: null };
+    leagueSeasonId = await ensureLeagueSeason(sport, format, division, level, area);
+  }
 
   let entrantId: string;
   if (format === "doubles") {
@@ -87,7 +117,7 @@ export async function joinLeague(formData: FormData) {
   const checkoutUrl = await createCheckoutUrl(
     enrollmentId as string,
     format,
-    describeLeague(sport, format, division, level, area),
+    leagueLabel(template as any),
     user.email ?? undefined
   );
   redirect(checkoutUrl);
@@ -119,7 +149,7 @@ export async function resumeCheckout(enrollmentId: string) {
   // start a checkout for somebody else's enrollment.
   const { data: enrollment } = await supabase
     .from("enrollments")
-    .select("id, paid, league_seasons(league_templates(sport, format, division, level, area))")
+    .select("id, paid, league_seasons(league_templates(sport, format, division, level, area, name))")
     .eq("id", enrollmentId)
     .single();
 
@@ -134,7 +164,7 @@ export async function resumeCheckout(enrollmentId: string) {
   const checkoutUrl = await createCheckoutUrl(
     enrollmentId,
     t?.format ?? "singles",
-    t ? describeLeague(t.sport, t.format, t.division, t.level, t.area) : "League entry",
+    t ? leagueLabel(t) : "League entry",
     user.email ?? undefined
   );
   redirect(checkoutUrl);
