@@ -11,7 +11,7 @@ export default async function JoinLeaguePage() {
 
   const { data: profile } = await supabase
     .from("profiles")
-    .select("gender")
+    .select("gender, rating")
     .eq("id", user.id)
     .single();
 
@@ -45,7 +45,7 @@ export default async function JoinLeaguePage() {
       <p className="text-chalk-dim text-sm mb-6">
         Pick a sport, format, and level. If that exact league doesn&apos;t exist yet, you&apos;ll be the first one in it.
       </p>
-      <JoinLeagueForm clubLeagues={clubLeagues ?? []} gender={(profile?.gender as "male" | "female") ?? "female"} />
+      <JoinLeagueForm clubLeagues={clubLeagues ?? []} initialRating={profile?.rating ?? ""} gender={(profile?.gender as "male" | "female") ?? "female"} />
     </main>
   );
 }
