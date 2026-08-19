@@ -29,6 +29,17 @@ type MatchResult = {
 };
 type StandingsRow = { entrantId: string; points: number; wins: number; losses: number };
 
+/**
+ * Total games (tennis) or points (pickleball) across the whole match.
+ *
+ * This aggregate is what computePoints() divides the 20 league points by, so
+ * showing it makes the standings explicable: a player can see why a 8-6 win
+ * scored differently from an 8-1 one.
+ */
+function totalsFor(sets: { a: number; b: number }[]): { a: number; b: number } {
+  return sets.reduce((acc, s) => ({ a: acc.a + s.a, b: acc.b + s.b }), { a: 0, b: 0 });
+}
+
 /** Rating chip shown beside a name in open leagues. */
 function RatingBadge({ rating }: { rating: string | null }) {
   if (!rating) return null;
@@ -91,6 +102,7 @@ type Props = {
   defaultLocation: string;
   entrantRatings: Record<string, string | null>;
   showRatings: boolean;
+  scoringFormat: "standard" | "single_set";
   sport: "tennis" | "pickleball";
   myEntrantId: string | null;
   entrantNames: Record<string, string>;
@@ -137,12 +149,19 @@ function useAction() {
 function ScoreForm({
   sport,
   onSubmit,
+  scoringFormat = "standard",
 }: {
   sport: "tennis" | "pickleball";
   onSubmit: (payload: any) => void;
+  scoringFormat?: "standard" | "single_set";
 }) {
-  const [rounds, setRounds] = useState([{ a: "", b: "" }, { a: "", b: "" }]);
-  const label = sport === "tennis" ? "Set" : "Game";
+  // A pro set is the whole match, so the form opens with one row and does not
+  // offer to add more.
+  const singleSet = sport === "tennis" && scoringFormat === "single_set";
+  const [rounds, setRounds] = useState(
+    singleSet ? [{ a: "", b: "" }] : [{ a: "", b: "" }, { a: "", b: "" }]
+  );
+  const label = sport === "tennis" ? (singleSet ? "Games" : "Set") : "Game";
 
   function updateRound(i: number, field: "a" | "b", value: string) {
     setRounds((prev) => prev.map((r, idx) => (idx === i ? { ...r, [field]: value } : r)));
@@ -165,11 +184,11 @@ function ScoreForm({
       <div className="flex flex-wrap items-center gap-3 mb-2">
         {rounds.map((r, i) => (
           <div key={i} className="flex items-center gap-1">
-            <span className="text-chalk-dim text-xs">{label} {i + 1}</span>
+            <span className="text-chalk-dim text-xs">{singleSet ? label : `${label} ${i + 1}`}</span>
             <input type="number" min="0" value={r.a} onChange={(e) => updateRound(i, "a", e.target.value)} className="w-12 bg-court-deep border border-white/10 rounded px-1 py-1 text-center text-sm" />
             <span className="text-chalk-dim">-</span>
             <input type="number" min="0" value={r.b} onChange={(e) => updateRound(i, "b", e.target.value)} className="w-12 bg-court-deep border border-white/10 rounded px-1 py-1 text-center text-sm" />
-            {rounds.length > 1 && (
+            {!singleSet && rounds.length > 1 && (
               <button type="button" onClick={() => removeRound(i)} className="text-chalk-dim text-xs px-1" aria-label={`Remove ${label.toLowerCase()} ${i + 1}`}>
                 &times;
               </button>
@@ -177,10 +196,18 @@ function ScoreForm({
           </div>
         ))}
       </div>
+      {singleSet && (
+        <p className="text-chalk-dim text-xs mb-2">
+          One set. Enter the games as played &mdash; any score is fine, including a
+          match cut short by rain or injury.
+        </p>
+      )}
       <div className="flex items-center gap-3">
-        <button type="button" onClick={addRound} className="text-ball text-xs font-display">
-          + Add another {label.toLowerCase()}
-        </button>
+        {!singleSet && (
+          <button type="button" onClick={addRound} className="text-ball text-xs font-display">
+            + Add another {label.toLowerCase()}
+          </button>
+        )}
         <button
           type="button"
           onClick={handleSubmit}
@@ -193,7 +220,7 @@ function ScoreForm({
   );
 }
 
-export function LeagueClient({ leagueSeasonId, sport, myEntrantId, entrantNames, entrantAvatars, standings, matches, resultsByMatch, defaultLocation, entrantRatings, showRatings }: Props) {
+export function LeagueClient({ leagueSeasonId, sport, myEntrantId, entrantNames, entrantAvatars, standings, matches, resultsByMatch, defaultLocation, entrantRatings, showRatings, scoringFormat }: Props) {
   /** Rating badge text for an entrant, or null when this league does not use them. */
   const ratingOf = (id: string) => (showRatings ? entrantRatings[id] ?? null : null);
   const [tab, setTab] = useState<"rankings" | "offers" | "challenges" | "matches">("rankings");
@@ -216,7 +243,7 @@ export function LeagueClient({ leagueSeasonId, sport, myEntrantId, entrantNames,
       {tab === "rankings" && <RankingsTab standings={standings} name={name} myEntrantId={myEntrantId} ratingOf={ratingOf} />}
       {tab === "offers" && <OffersTab leagueSeasonId={leagueSeasonId} matches={matches} name={name} avatar={(id: string) => entrantAvatars[id] ?? null} rank={rank} myEntrantId={myEntrantId} defaultLocation={defaultLocation} ratingOf={ratingOf} />}
       {tab === "challenges" && <ChallengesTab leagueSeasonId={leagueSeasonId} matches={matches} standings={standings} name={name} avatar={(id: string) => entrantAvatars[id] ?? null} rank={rank} myEntrantId={myEntrantId} defaultLocation={defaultLocation} ratingOf={ratingOf} />}
-      {tab === "matches" && <MatchesTab sport={sport} matches={matches} resultsByMatch={resultsByMatch} name={name} myEntrantId={myEntrantId} />}
+      {tab === "matches" && <MatchesTab sport={sport} matches={matches} resultsByMatch={resultsByMatch} name={name} myEntrantId={myEntrantId} scoringFormat={scoringFormat} />}
     </div>
   );
 }
@@ -373,7 +400,7 @@ function ChallengesTab({ leagueSeasonId, matches, standings, name, avatar, rank,
   );
 }
 
-function MatchesTab({ sport, matches, resultsByMatch, name, myEntrantId }: { sport: "tennis" | "pickleball"; matches: Match[]; resultsByMatch: Record<string, MatchResult>; name: (id: string) => string; myEntrantId: string | null }) {
+function MatchesTab({ sport, matches, resultsByMatch, name, myEntrantId, scoringFormat }: { sport: "tennis" | "pickleball"; matches: Match[]; resultsByMatch: Record<string, MatchResult>; name: (id: string) => string; myEntrantId: string | null; scoringFormat: "standard" | "single_set" }) {
   const { run, error } = useAction();
 
   const scheduled = matches.filter((m) => m.status === "scheduled" && (m.entrant_a_id === myEntrantId || m.entrant_b_id === myEntrantId));
@@ -394,7 +421,7 @@ function MatchesTab({ sport, matches, resultsByMatch, name, myEntrantId }: { spo
                 {name(m.entrant_a_id)} vs {m.entrant_b_id ? name(m.entrant_b_id) : "\u2014"} &middot; {m.scheduled_date} {m.scheduled_time} &middot; {m.location}
               </div>
               {!result && (
-                <ScoreForm sport={sport} onSubmit={(payload) => run(() => reportScore(m.id, payload))} />
+                <ScoreForm sport={sport} scoringFormat={scoringFormat} onSubmit={(payload) => run(() => reportScore(m.id, payload))} />
               )}
               {result && !result.confirmed_by && result.reporter_entrant_id === myEntrantId && (
                 <div className="flex items-center gap-3 flex-wrap">
@@ -438,6 +465,11 @@ function MatchesTab({ sport, matches, resultsByMatch, name, myEntrantId }: { spo
               <div className="flex-1 text-sm">
                 {name(m.entrant_a_id)} vs {m.entrant_b_id ? name(m.entrant_b_id) : "\u2014"}
                 {result && <span className="font-score ml-2">{result.sets.map((s) => `${s.a}-${s.b}`).join(", ")}</span>}
+                {result && result.sets.length > 1 && (
+                  <span className="text-chalk-dim text-xs ml-2">
+                    ({sport === "tennis" ? "games" : "points"} {totalsFor(result.sets).a}-{totalsFor(result.sets).b})
+                  </span>
+                )}
               </div>
               {result && <div className="text-xs font-score text-chalk-dim">+{result.points_a} / +{result.points_b} pts</div>}
             </div>
