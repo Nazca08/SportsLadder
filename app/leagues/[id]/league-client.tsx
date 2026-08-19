@@ -29,8 +29,56 @@ type MatchResult = {
 };
 type StandingsRow = { entrantId: string; points: number; wins: number; losses: number };
 
+/**
+ * Match location, defaulting to the league's home area.
+ *
+ * Most matches in a club league happen at the club, so making players retype
+ * the venue every time is friction for no benefit. Picking "Other" swaps in a
+ * free-text box for the times it is somewhere else.
+ */
+function LocationField({ defaultLocation }: { defaultLocation: string }) {
+  const [custom, setCustom] = useState(false);
+
+  if (custom) {
+    return (
+      <div className="flex gap-2">
+        <input
+          name="location"
+          placeholder="Where are you playing?"
+          required
+          autoFocus
+          className="flex-1 bg-panel border border-white/10 rounded-lg px-2 py-2 text-sm"
+        />
+        <button
+          type="button"
+          onClick={() => setCustom(false)}
+          className="text-chalk-dim text-xs px-2 hover:text-chalk"
+          aria-label="Use the default location"
+        >
+          Cancel
+        </button>
+      </div>
+    );
+  }
+
+  return (
+    <>
+      <input type="hidden" name="location" value={defaultLocation} />
+      <select
+        value="default"
+        onChange={(e) => { if (e.target.value === "other") setCustom(true); }}
+        className="bg-panel border border-white/10 rounded-lg px-2 py-2 text-sm"
+      >
+        <option value="default">{defaultLocation}</option>
+        <option value="other">Somewhere else…</option>
+      </select>
+    </>
+  );
+}
+
 type Props = {
   leagueSeasonId: string;
+  defaultLocation: string;
   sport: "tennis" | "pickleball";
   myEntrantId: string | null;
   entrantNames: Record<string, string>;
@@ -133,7 +181,7 @@ function ScoreForm({
   );
 }
 
-export function LeagueClient({ leagueSeasonId, sport, myEntrantId, entrantNames, entrantAvatars, standings, matches, resultsByMatch }: Props) {
+export function LeagueClient({ leagueSeasonId, sport, myEntrantId, entrantNames, entrantAvatars, standings, matches, resultsByMatch, defaultLocation }: Props) {
   const [tab, setTab] = useState<"rankings" | "offers" | "challenges" | "matches">("rankings");
   const name = (id: string) => entrantNames[id] ?? "Unknown";
   const rank = (id: string): number | null => {
@@ -152,8 +200,8 @@ export function LeagueClient({ leagueSeasonId, sport, myEntrantId, entrantNames,
       </div>
 
       {tab === "rankings" && <RankingsTab standings={standings} name={name} myEntrantId={myEntrantId} />}
-      {tab === "offers" && <OffersTab leagueSeasonId={leagueSeasonId} matches={matches} name={name} avatar={(id: string) => entrantAvatars[id] ?? null} rank={rank} myEntrantId={myEntrantId} />}
-      {tab === "challenges" && <ChallengesTab leagueSeasonId={leagueSeasonId} matches={matches} standings={standings} name={name} avatar={(id: string) => entrantAvatars[id] ?? null} rank={rank} myEntrantId={myEntrantId} />}
+      {tab === "offers" && <OffersTab leagueSeasonId={leagueSeasonId} matches={matches} name={name} avatar={(id: string) => entrantAvatars[id] ?? null} rank={rank} myEntrantId={myEntrantId} defaultLocation={defaultLocation} />}
+      {tab === "challenges" && <ChallengesTab leagueSeasonId={leagueSeasonId} matches={matches} standings={standings} name={name} avatar={(id: string) => entrantAvatars[id] ?? null} rank={rank} myEntrantId={myEntrantId} defaultLocation={defaultLocation} />}
       {tab === "matches" && <MatchesTab sport={sport} matches={matches} resultsByMatch={resultsByMatch} name={name} myEntrantId={myEntrantId} />}
     </div>
   );
@@ -179,7 +227,7 @@ function RankingsTab({ standings, name, myEntrantId }: { standings: StandingsRow
   );
 }
 
-function OffersTab({ leagueSeasonId, matches, name, avatar, rank, myEntrantId }: { leagueSeasonId: string; matches: Match[]; name: (id: string) => string; avatar: (id: string) => string | null; rank: (id: string) => number | null; myEntrantId: string | null }) {
+function OffersTab({ leagueSeasonId, matches, name, avatar, rank, myEntrantId, defaultLocation }: { leagueSeasonId: string; matches: Match[]; name: (id: string) => string; avatar: (id: string) => string | null; rank: (id: string) => number | null; myEntrantId: string | null; defaultLocation: string }) {
   const { run, pending, error } = useAction();
   const [showForm, setShowForm] = useState(false);
   const [collapsed, setCollapsed] = useState(false);
@@ -202,7 +250,7 @@ function OffersTab({ leagueSeasonId, matches, name, avatar, rank, myEntrantId }:
         <form action={submitOffer} className="bg-court-deep border border-white/10 rounded-xl p-4 mb-4 grid sm:grid-cols-3 gap-3">
           <input name="date" type="date" required className="bg-panel border border-white/10 rounded-lg px-2 py-2 text-sm" />
           <input name="time" type="time" required className="bg-panel border border-white/10 rounded-lg px-2 py-2 text-sm" />
-          <input name="location" placeholder="Location" required className="bg-panel border border-white/10 rounded-lg px-2 py-2 text-sm" />
+          <LocationField defaultLocation={defaultLocation} />
           <button type="submit" disabled={pending} className="sm:col-span-3 bg-ball text-ink font-display font-semibold rounded-lg py-2 text-sm">Post offer</button>
         </form>
       )}
@@ -242,7 +290,7 @@ function OffersTab({ leagueSeasonId, matches, name, avatar, rank, myEntrantId }:
   );
 }
 
-function ChallengesTab({ leagueSeasonId, matches, standings, name, avatar, rank, myEntrantId }: { leagueSeasonId: string; matches: Match[]; standings: StandingsRow[]; name: (id: string) => string; avatar: (id: string) => string | null; rank: (id: string) => number | null; myEntrantId: string | null }) {
+function ChallengesTab({ leagueSeasonId, matches, standings, name, avatar, rank, myEntrantId, defaultLocation }: { leagueSeasonId: string; matches: Match[]; standings: StandingsRow[]; name: (id: string) => string; avatar: (id: string) => string | null; rank: (id: string) => number | null; myEntrantId: string | null; defaultLocation: string }) {
   const { run, pending, error } = useAction();
   const [opponentId, setOpponentId] = useState("");
 
@@ -260,14 +308,14 @@ function ChallengesTab({ leagueSeasonId, matches, standings, name, avatar, rank,
         <h3 className="font-display font-semibold mb-3">Challenge a player</h3>
         <form action={submitChallenge} className="bg-court-deep border border-white/10 rounded-xl p-4 grid sm:grid-cols-4 gap-3">
           <select value={opponentId} onChange={(e) => setOpponentId(e.target.value)} className="bg-panel border border-white/10 rounded-lg px-2 py-2 text-sm">
-            <option value="">Opponent\u2026</option>
+            <option value="" disabled>Choose an opponent…</option>
             {standings.filter((s) => s.entrantId !== myEntrantId).map((s) => (
               <option key={s.entrantId} value={s.entrantId}>#{rank(s.entrantId)} {name(s.entrantId)}</option>
             ))}
           </select>
           <input name="date" type="date" required className="bg-panel border border-white/10 rounded-lg px-2 py-2 text-sm" />
           <input name="time" type="time" required className="bg-panel border border-white/10 rounded-lg px-2 py-2 text-sm" />
-          <input name="location" placeholder="Location" required className="bg-panel border border-white/10 rounded-lg px-2 py-2 text-sm" />
+          <LocationField defaultLocation={defaultLocation} />
           <button type="submit" disabled={pending || !opponentId} className="sm:col-span-4 bg-paddle font-display text-sm font-semibold rounded-lg py-2">Send challenge</button>
         </form>
         {error && <div className="text-paddle text-xs mt-2">{error}</div>}
