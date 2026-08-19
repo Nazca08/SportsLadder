@@ -18,13 +18,18 @@ export type ClubLeague = {
 export function JoinLeagueForm({
   gender,
   clubLeagues = [],
+  initialRating = "",
 }: {
   gender: "male" | "female";
   clubLeagues?: ClubLeague[];
+  initialRating?: string;
 }) {
   // When a club league is selected the five dropdowns are irrelevant -- the
   // league is taken whole from the stored row.
   const [clubId, setClubId] = useState("");
+  // Open leagues mix every rating in one ladder, so the player has to supply
+  // theirs -- there is no league-level rating to infer it from.
+  const [myRating, setMyRating] = useState(initialRating);
   const club = clubLeagues.find((c) => c.id === clubId) ?? null;
   const [sport, setSport] = useState<(typeof SPORTS)[number]>("tennis");
   const [format, setFormat] = useState<Format>("singles");
@@ -72,7 +77,12 @@ export function JoinLeagueForm({
       return;
     }
     if (club) {
+      if (club.level === "open" && !myRating) {
+        setError("Pick your rating so opponents know what to expect.");
+        return;
+      }
       formData.set("clubTemplateId", club.id);
+      formData.set("myRating", myRating);
     }
     formData.set("division", effectiveDivision);
     formData.set("area", area);
@@ -119,6 +129,23 @@ export function JoinLeagueForm({
             {club
               ? "Tap it again to browse leagues by city instead."
               : "Or pick a league by city below."}
+          </p>
+        </div>
+      )}
+
+      {club && club.level === "open" && (
+        <div className="mb-4">
+          <label className="block text-chalk-dim text-xs mb-1">Your rating</label>
+          <select
+            value={myRating}
+            onChange={(e) => setMyRating(e.target.value)}
+            className="w-full bg-court-deep border border-white/10 rounded-lg px-2 py-2 text-sm"
+          >
+            <option value="" disabled>Choose your rating…</option>
+            {LEVELS.map((l) => <option key={l} value={l}>{l}</option>)}
+          </select>
+          <p className="text-chalk-dim text-xs mt-1">
+            This league mixes all ratings, so yours is shown next to your name.
           </p>
         </div>
       )}
