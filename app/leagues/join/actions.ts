@@ -66,6 +66,13 @@ export async function joinLeague(formData: FormData) {
       throw new Error("Pick a partner to join a doubles league.");
     }
 
+    // Save the rating on the profile so it follows the player everywhere,
+    // rather than being trapped in this one enrollment.
+    const myRating = formData.get("myRating") ? String(formData.get("myRating")) : "";
+    if (myRating) {
+      await supabase.from("profiles").update({ rating: myRating }).eq("id", user.id);
+    }
+
     leagueSeasonId = await ensureLeagueSeasonForTemplate(clubTemplateId);
   } else {
     sport = String(formData.get("sport"));
