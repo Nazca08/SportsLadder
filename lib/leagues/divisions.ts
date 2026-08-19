@@ -13,7 +13,14 @@ export function divisionOptions(gender: Gender, format: Format): [Division, stri
 }
 
 export const SPORTS = ["tennis", "pickleball"] as const;
-export const LEVELS = ["2.0", "2.5", "3.0", "3.5", "4.0", "4.5"] as const;
+export const LEVELS = ["2.0", "2.5", "3.0", "3.5", "4.0", "4.5", "5.0"] as const;
+
+/**
+ * Sentinel used by named club leagues that span every rating and mix men and
+ * women. Deliberately NOT in LEVELS or divisionOptions -- it must never show up
+ * as a pickable option in the ordinary rating-scoped sign-up flow.
+ */
+export const OPEN = "open";
 
 /** The only markets RallyRank.club currently operates in. */
 export const AREAS: [string, string][] = [
