@@ -2,6 +2,7 @@ import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { SignOutButton } from "@/components/sign-out-button";
 import { JoinLeagueForm } from "./join-form";
+import { PROMO_CODE, PROMO_BLURB } from "@/lib/payments/checkout";
 
 export default async function JoinLeaguePage() {
   const supabase = createClient();
@@ -25,6 +26,13 @@ export default async function JoinLeaguePage() {
       <div className="flex items-center justify-between mb-1">
         <h1 className="font-display text-2xl font-bold">Join a league</h1>
         <SignOutButton />
+      </div>
+      <div className="mt-4 mb-5 rounded-lg border border-ball/40 bg-ball/10 p-3 text-center">
+        <p className="text-xs text-chalk-dim">
+          Use code{" "}
+          <span className="font-score font-bold tracking-wider text-ball">{PROMO_CODE}</span>{" "}
+          at checkout &mdash; leagues are {PROMO_BLURB}.
+        </p>
       </div>
       <p className="text-chalk-dim text-sm mb-6">
         Pick a sport, format, and level. If that exact league doesn&apos;t exist yet, you&apos;ll be the first one in it.
