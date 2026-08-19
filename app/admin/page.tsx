@@ -2,14 +2,8 @@ import { redirect } from "next/navigation";
 import { requireAdmin } from "@/lib/admin/require-admin";
 import { SignOutButton } from "@/components/sign-out-button";
 import { AdminClient } from "./admin-client";
+import { leagueLabel } from "@/lib/leagues/label";
 
-function leagueLabel(t: { sport: string; format: string; division: string; level: string; area: string } | null) {
-  if (!t) return "Unknown league";
-  const sport = t.sport === "tennis" ? "Tennis" : "Pickleball";
-  const format = t.format === "doubles" ? "Doubles" : "Singles";
-  const division = t.division === "mixed" ? "Mixed" : t.division === "mens" ? "Men's" : "Women's";
-  return `${sport} ${format} \u00b7 ${division} \u00b7 ${t.level} \u00b7 ${t.area}`;
-}
 
 export default async function AdminPage() {
   let admin;
@@ -31,7 +25,7 @@ export default async function AdminPage() {
   // League label per match -- resolved once per distinct league_season_id.
   const leagueSeasonIds = Array.from(new Set(rows.map((m) => m.league_season_id).filter(Boolean)));
   const { data: leagueSeasons } = leagueSeasonIds.length
-    ? await admin.from("league_seasons").select("id, league_templates(sport, format, division, level, area)").in("id", leagueSeasonIds)
+    ? await admin.from("league_seasons").select("id, league_templates(sport, format, division, level, area, name)").in("id", leagueSeasonIds)
     : { data: [] as any[] };
   const leagueLabelBySeasonId = new Map(
     (leagueSeasons ?? []).map((ls: any) => {
