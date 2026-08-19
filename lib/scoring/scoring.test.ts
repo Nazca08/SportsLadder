@@ -58,19 +58,50 @@ describe("resolveTennisMatch", () => {
       expect(result.gamesB).toBe(12);
     }
   });
-  it("rejects an unfinished match", () => {
+  it("accepts a single decisive set (no best-of-3 requirement)", () => {
     const result = resolveTennisMatch([{ a: 6, b: 4 }]);
+    expect(result.valid).toBe(true);
+    if (result.valid) expect(result.winnerSide).toBe("a");
+  });
+  it("accepts more than 3 sets, as long as played sessions call for it", () => {
+    const result = resolveTennisMatch([
+      { a: 6, b: 4 }, { a: 4, b: 6 }, { a: 6, b: 3 }, { a: 4, b: 6 }, { a: 6, b: 2 },
+    ]);
+    expect(result.valid).toBe(true);
+    if (result.valid) expect(result.winnerSide).toBe("a"); // 3 sets to 2
+  });
+  it("rejects an even split with no winner", () => {
+    const result = resolveTennisMatch([{ a: 6, b: 4 }, { a: 4, b: 6 }]);
     expect(result.valid).toBe(false);
   });
 });
 
 describe("resolvePickleballMatch", () => {
   it("requires reaching 11", () => {
-    expect(resolvePickleballMatch(10, 8).valid).toBe(false);
+    expect(resolvePickleballMatch([{ a: 10, b: 8 }]).valid).toBe(false);
   });
   it("requires winning by 2", () => {
-    expect(resolvePickleballMatch(11, 10).valid).toBe(false);
-    expect(resolvePickleballMatch(12, 10).valid).toBe(true);
+    expect(resolvePickleballMatch([{ a: 11, b: 10 }]).valid).toBe(false);
+    expect(resolvePickleballMatch([{ a: 12, b: 10 }]).valid).toBe(true);
+  });
+  it("supports a session of several games, winner by majority", () => {
+    const result = resolvePickleballMatch([
+      { a: 11, b: 7 }, { a: 9, b: 11 }, { a: 11, b: 8 }, { a: 6, b: 11 }, { a: 11, b: 9 },
+    ]);
+    expect(result.valid).toBe(true);
+    if (result.valid) expect(result.winnerSide).toBe("a"); // 3 games to 2
+  });
+  it("aggregates points across every game played", () => {
+    const result = resolvePickleballMatch([{ a: 11, b: 7 }, { a: 11, b: 9 }]);
+    expect(result.valid).toBe(true);
+    if (result.valid) {
+      expect(result.scoreA).toBe(22);
+      expect(result.scoreB).toBe(16);
+    }
+  });
+  it("rejects an even split with no winner", () => {
+    const result = resolvePickleballMatch([{ a: 11, b: 7 }, { a: 7, b: 11 }]);
+    expect(result.valid).toBe(false);
   });
 });
 
@@ -161,5 +192,61 @@ describe("resolveAnnualEntrants substitution", () => {
     // so it should fall to Leo (rank 3).
     expect(winterRunnerUpSlot?.entrantId).toBe("leo");
     expect(winterRunnerUpSlot?.substituted).toBe(true);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Single set, permissive (Palmas Tennis League)
+// ---------------------------------------------------------------------------
+describe("single set format", () => {
+  it("accepts the intended pro-set scores", () => {
+    expect(isValidSet(8, 6, "single_set")).toBe(true);
+    expect(isValidSet(9, 7, "single_set")).toBe(true);
+    expect(isValidSet(9, 8, "single_set")).toBe(true);
+  });
+
+  it("accepts a match cut short by rain or injury", () => {
+    expect(isValidSet(4, 2, "single_set")).toBe(true);
+    expect(isValidSet(1, 0, "single_set")).toBe(true);
+  });
+
+  it("accepts a long set that was played out past 8", () => {
+    expect(isValidSet(13, 11, "single_set")).toBe(true);
+  });
+
+  it("still rejects negative games, which are typos rather than results", () => {
+    expect(isValidSet(-1, 4, "single_set")).toBe(false);
+  });
+
+  it("leaves standard leagues strict", () => {
+    expect(isValidSet(8, 6, "standard")).toBe(false);
+    expect(isValidSet(4, 2, "standard")).toBe(false);
+  });
+
+  it("resolves an unfinished set, using games as the aggregate", () => {
+    const result = resolveTennisMatch([{ a: 4, b: 2 }], "single_set");
+    expect(result.valid).toBe(true);
+    if (result.valid) {
+      expect(result.winnerSide).toBe("a");
+      expect(result.gamesA).toBe(4);
+      expect(result.gamesB).toBe(2);
+    }
+  });
+
+  it("refuses more than one set", () => {
+    const result = resolveTennisMatch([{ a: 8, b: 5 }, { a: 8, b: 4 }], "single_set");
+    expect(result.valid).toBe(false);
+  });
+
+  it("refuses a draw, since 20 points cannot be split without a winner", () => {
+    const result = resolveTennisMatch([{ a: 5, b: 5 }], "single_set");
+    expect(result.valid).toBe(false);
+  });
+
+  it("awards points on the games played, however few", () => {
+    // 8-5 is 13 games; the loser's share rounds to 20 * 5/13 = 8.
+    expect(computePoints(8, 5)).toEqual({ pointsA: 12, pointsB: 8 });
+    // A short 4-2 splits on the same ratio as 8-4 would.
+    expect(computePoints(4, 2)).toEqual({ pointsA: 13, pointsB: 7 });
   });
 });
