@@ -34,7 +34,7 @@ export default async function LeaguePage({
 
   const { data: leagueSeason } = await supabase
     .from("league_seasons")
-    .select("id, league_templates(sport, format, division, level, area, name)")
+    .select("id, league_templates(sport, format, division, level, area, name, scoring_format)")
     .eq("id", leagueSeasonId)
     .single();
   if (!leagueSeason) notFound();
@@ -111,6 +111,7 @@ export default async function LeaguePage({
         entrantAvatars={Object.fromEntries(entrantAvatars)}
         entrantRatings={Object.fromEntries(entrantRatings)}
         showRatings={(template as any)?.level === "open"}
+        scoringFormat={((template as any)?.scoring_format ?? "standard") as "standard" | "single_set"}
         standings={standings}
         matches={matches}
         resultsByMatch={Object.fromEntries(resultsByMatch)}
