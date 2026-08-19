@@ -135,7 +135,7 @@ export function SettingsClient({ userId, email, profile, stats }: Props) {
       <section className="bg-panel border border-white/10 rounded-2xl p-6">
         <h2 className="font-display text-lg font-semibold mb-1">Profile</h2>
         <p className="text-chalk-dim text-xs mb-4">
-          Team or display name is optional \u2014 if set, it's shown instead of your real name on standings, offers, and challenges.
+          Team or display name is optional — if set, it's shown instead of your real name on standings, offers, and challenges.
         </p>
         <div className="space-y-3">
           <div>
