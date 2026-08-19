@@ -1,5 +1,6 @@
 import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
+import { PROMO_CODE, PROMO_BLURB } from "@/lib/payments/checkout";
 
 // The racquet string-bed texture used behind the hero and the closing CTA.
 const STRING_BED = {
@@ -131,6 +132,13 @@ export default async function Home() {
               >
                 I already play here
               </a>
+            </div>
+            <div className="mt-7 inline-flex flex-wrap items-center gap-x-3 gap-y-1 rounded-xl border border-ball/40 bg-ball/10 px-4 py-3">
+              <span className="text-sm text-chalk">Launch promo &mdash; use code</span>
+              <span className="font-score text-base font-bold tracking-[0.15em] text-ball">
+                {PROMO_CODE}
+              </span>
+              <span className="text-sm text-chalk-dim">for {PROMO_BLURB}</span>
             </div>
             <p className="mt-6 font-score text-xs tracking-wider text-chalk-dim">
               LEVELS 2.0 - 4.5 / FIVE MARKETS / FOUR SEASONS A YEAR
@@ -363,7 +371,9 @@ export default async function Home() {
           </h2>
           <p className="mx-auto mt-6 max-w-xl text-base leading-relaxed text-chalk-dim sm:text-lg">
             Signing up takes a minute. Pick your sport, your level, and your area, and you
-            are on the ladder.
+            are on the ladder. Use code{" "}
+            <span className="font-score font-bold tracking-wider text-ball">{PROMO_CODE}</span>{" "}
+            at checkout and it is {PROMO_BLURB}.
           </p>
           <a
             href="/signup"
