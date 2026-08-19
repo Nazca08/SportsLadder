@@ -2,16 +2,10 @@ import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { SignOutButton } from "@/components/sign-out-button";
 import { AREAS } from "@/lib/leagues/divisions";
+import { leagueLabel } from "@/lib/leagues/label";
 
 const areaName = (code?: string) => AREAS.find(([c]) => c === code)?.[1] ?? code;
 
-function leagueLabel(t: { sport: string; format: string; division: string; level: string; area?: string }) {
-  const sport = t.sport === "tennis" ? "Tennis" : "Pickleball";
-  const format = t.format === "doubles" ? "Doubles" : "Singles";
-  const division = t.division === "mixed" ? "Mixed" : t.division === "mens" ? "Men's" : "Women's";
-  const area = areaName(t.area);
-  return `${sport} ${format} \u00b7 ${division} \u00b7 ${t.level}${area ? ` \u00b7 ${area}` : ""}`;
-}
 
 export default async function DashboardPage() {
   const supabase = createClient();
@@ -23,7 +17,7 @@ export default async function DashboardPage() {
   // Enrollments where I'm the direct player...
   const { data: directEnrollments } = await supabase
     .from("enrollments")
-    .select("id, league_seasons(id, league_templates(sport, format, division, level, area))")
+    .select("id, league_seasons(id, league_templates(sport, format, division, level, area, name))")
     .eq("player_id", user.id);
 
   // ...plus enrollments through a doubles team I'm on.
@@ -36,7 +30,7 @@ export default async function DashboardPage() {
   const { data: teamEnrollments } = teamIds.length
     ? await supabase
         .from("enrollments")
-        .select("id, league_seasons(id, league_templates(sport, format, division, level, area))")
+        .select("id, league_seasons(id, league_templates(sport, format, division, level, area, name))")
         .in("team_id", teamIds)
     : { data: [] as any[] };
 
