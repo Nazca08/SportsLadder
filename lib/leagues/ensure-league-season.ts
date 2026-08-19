@@ -13,30 +13,46 @@ const CURRENT_SEASON_NAME = "Ongoing Season";
  * continuously-running season so the core league loop (offers, challenges,
  * scoring, standings) can be built and tested against something real.
  */
-export async function ensureLeagueSeason(
-  sport: string,
-  format: string,
-  division: string,
-  level: string,
-  area: string
-): Promise<string> {
+/**
+ * Season lookup for a league_template that already exists -- named club
+ * leagues, which are created by migration rather than conjured from dropdown
+ * choices. Deliberately never inserts a template: if the id is wrong we want a
+ * failure, not a silent empty league.
+ */
+export async function ensureLeagueSeasonForTemplate(templateId: string): Promise<string> {
   const admin = createAdminClient();
 
-  let { data: template } = await admin
+  const { data: template } = await admin
     .from("league_templates")
     .select("id")
-    .match({ sport, format, division, level, area })
+    .eq("id", templateId)
+    .maybeSingle();
+  if (!template) throw new Error("That league no longer exists.");
+
+  const seasonId = await currentSeasonId();
+
+  let { data: leagueSeason } = await admin
+    .from("league_seasons")
+    .select("id")
+    .match({ league_template_id: templateId, season_id: seasonId })
     .maybeSingle();
 
-  if (!template) {
+  if (!leagueSeason) {
     const { data: created, error } = await admin
-      .from("league_templates")
-      .insert({ sport, format, division, level, area })
+      .from("league_seasons")
+      .insert({ league_template_id: templateId, season_id: seasonId })
       .select("id")
       .single();
     if (error) throw error;
-    template = created;
+    leagueSeason = created;
   }
+
+  return leagueSeason.id as string;
+}
+
+/** The season everything currently lands in. Shared by both entry points. */
+async function currentSeasonId(): Promise<string> {
+  const admin = createAdminClient();
 
   let { data: season } = await admin
     .from("seasons")
@@ -62,16 +78,46 @@ export async function ensureLeagueSeason(
     season = created;
   }
 
+  return season.id as string;
+}
+
+export async function ensureLeagueSeason(
+  sport: string,
+  format: string,
+  division: string,
+  level: string,
+  area: string
+): Promise<string> {
+  const admin = createAdminClient();
+
+  let { data: template } = await admin
+    .from("league_templates")
+    .select("id")
+    .match({ sport, format, division, level, area })
+    .maybeSingle();
+
+  if (!template) {
+    const { data: created, error } = await admin
+      .from("league_templates")
+      .insert({ sport, format, division, level, area })
+      .select("id")
+      .single();
+    if (error) throw error;
+    template = created;
+  }
+
+  const seasonId = await currentSeasonId();
+
   let { data: leagueSeason } = await admin
     .from("league_seasons")
     .select("id")
-    .match({ league_template_id: template.id, season_id: season.id })
+    .match({ league_template_id: template.id, season_id: seasonId })
     .maybeSingle();
 
   if (!leagueSeason) {
     const { data: created, error } = await admin
       .from("league_seasons")
-      .insert({ league_template_id: template.id, season_id: season.id })
+      .insert({ league_template_id: template.id, season_id: seasonId })
       .select("id")
       .single();
     if (error) throw error;
