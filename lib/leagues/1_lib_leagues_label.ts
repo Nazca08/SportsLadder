@@ -1,0 +1,48 @@
+/**
+ * One place that turns a league_templates row into a human label.
+ *
+ * This used to be copy-pasted into the dashboard, the league page and the admin
+ * page. Named club leagues gave it a branch, and three near-identical copies of
+ * a branching function is how they drift apart.
+ */
+export type LeagueTemplateLike = {
+  sport: string;
+  format: string;
+  division: string;
+  level: string;
+  area?: string | null;
+  name?: string | null;
+} | null;
+
+const AREA_NAMES: Record<string, string> = {
+  "dallas-tx": "Dallas, Texas",
+  "utah-valley-ut": "Utah Valley, Utah",
+  "palmas-del-mar-pr": "Palmas Del Mar, Puerto Rico",
+  "minneapolis-mn": "Minneapolis, Minnesota",
+  "raleigh-nc": "Raleigh, North Carolina",
+};
+
+export function areaName(code?: string | null): string {
+  if (!code) return "";
+  return AREA_NAMES[code] ?? code;
+}
+
+export function leagueLabel(t: LeagueTemplateLike): string {
+  if (!t) return "League";
+
+  const format = t.format === "doubles" ? "Doubles" : "Singles";
+
+  // A named club league is identified by its name, not by its combination --
+  // "all ratings, everyone" is the point of it, so spelling out division and
+  // level would be noise.
+  if (t.name) return `${t.name} \u00b7 ${format}`;
+
+  const sport = t.sport === "tennis" ? "Tennis" : "Pickleball";
+  const division =
+    t.division === "mixed" ? "Mixed" : t.division === "mens" ? "Men's" : t.division === "womens" ? "Women's" : "Open";
+
+  const parts = [`${sport} ${format}`, division, t.level];
+  const area = areaName(t.area);
+  if (area) parts.push(area);
+  return parts.join(" \u00b7 ");
+}
