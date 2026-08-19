@@ -125,7 +125,8 @@ export async function joinLeague(formData: FormData) {
     enrollmentId as string,
     format,
     leagueLabel(template as any),
-    user.email ?? undefined
+    user.email ?? undefined,
+    user.id
   );
   redirect(checkoutUrl);
 }
@@ -172,7 +173,8 @@ export async function resumeCheckout(enrollmentId: string) {
     enrollmentId,
     t?.format ?? "singles",
     t ? leagueLabel(t) : "League entry",
-    user.email ?? undefined
+    user.email ?? undefined,
+    user.id
   );
   redirect(checkoutUrl);
 }
