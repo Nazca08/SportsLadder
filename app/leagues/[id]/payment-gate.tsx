@@ -1,5 +1,5 @@
 import { resumeCheckoutFromForm } from "@/app/leagues/join/actions";
-import { formattedFeeFor } from "@/lib/payments/checkout";
+import { formattedFeeFor, PROMO_CODE, PROMO_BLURB } from "@/lib/payments/checkout";
 import { SignOutButton } from "@/components/sign-out-button";
 import { LeaveLeagueButton } from "@/components/leave-league-button";
 
@@ -66,6 +66,14 @@ export function PaymentGate({
           {isDoubles ? " for the pair of you" : ""}, and you will be able to post offers,
           send challenges, and appear in the standings as soon as it clears.
         </p>
+
+        <div className="mb-6 rounded-lg border border-ball/40 bg-ball/10 p-4 text-center">
+          <p className="text-xs text-chalk-dim">Launch promo &mdash; enter at checkout</p>
+          <p className="font-score text-xl font-bold tracking-[0.15em] text-ball mt-1">
+            {PROMO_CODE}
+          </p>
+          <p className="text-xs text-chalk-dim mt-1">Leagues are {PROMO_BLURB}.</p>
+        </div>
 
         <form action={resumeCheckoutFromForm}>
           <input type="hidden" name="enrollmentId" value={enrollmentId} />
