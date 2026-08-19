@@ -109,16 +109,21 @@ export function JoinLeagueForm({
               >
                 <span className="block font-semibold">{leagueLabel(c)}</span>
                 <span className="block text-xs text-chalk-dim mt-0.5">
-                  All ratings &middot; open to everyone
+                  All ratings
+                  {c.division === "open" ? " \u00b7 open to everyone" : ""}
                 </span>
               </button>
             ))}
           </div>
           <p className="text-chalk-dim text-xs mt-3">
-            {club ? "Deselect to build a regular league instead." : "Or build your own below."}
+            {club
+              ? "Tap it again to browse leagues by city instead."
+              : "Or pick a league by city below."}
           </p>
         </div>
       )}
+
+      <p className={club ? "hidden" : "text-chalk-dim text-xs mb-2"}>Leagues by city</p>
 
       <div className={club ? "hidden" : "grid grid-cols-2 gap-2"}>
         <select
@@ -161,7 +166,7 @@ export function JoinLeagueForm({
         onChange={(e) => setArea(e.target.value)}
         className={`w-full bg-court-deep border border-white/10 rounded-lg px-2 py-2 text-sm ${club ? "hidden" : ""}`}
       >
-        <option value="">Area\u2026</option>
+        <option value="" disabled>Choose a city…</option>
         {AREAS.map(([code, name]) => <option key={code} value={code}>{name}</option>)}
       </select>
 
@@ -174,7 +179,7 @@ export function JoinLeagueForm({
             className="w-full bg-court-deep border border-white/10 rounded-lg px-3 py-2 text-sm"
           />
           <p className="text-chalk-dim text-xs mt-1">Your partner needs to have already signed up.</p>
-          {searching && <p className="text-chalk-dim text-xs mt-1">Searching\u2026</p>}
+          {searching && <p className="text-chalk-dim text-xs mt-1">Searching…</p>}
           {partnerResults.length > 0 && !partner && (
             <div className="mt-2 space-y-1">
               {partnerResults.map((p) => (
