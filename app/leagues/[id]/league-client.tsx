@@ -282,7 +282,7 @@ export function LeagueClient({ leagueSeasonId, sport, myEntrantId, entrantNames,
         ))}
       </div>
 
-      {tab === "rankings" && <RankingsTab standings={standings} name={name} myEntrantId={myEntrantId} ratingOf={ratingOf} />}
+      {tab === "rankings" && <RankingsTab standings={standings} name={name} avatar={(id: string) => entrantAvatars[id] ?? null} myEntrantId={myEntrantId} ratingOf={ratingOf} />}
       {tab === "offers" && <OffersTab leagueSeasonId={leagueSeasonId} matches={matches} name={name} avatar={(id: string) => entrantAvatars[id] ?? null} rank={rank} myEntrantId={myEntrantId} defaultLocation={defaultLocation} ratingOf={ratingOf} />}
       {tab === "challenges" && <ChallengesTab leagueSeasonId={leagueSeasonId} matches={matches} standings={standings} name={name} avatar={(id: string) => entrantAvatars[id] ?? null} rank={rank} myEntrantId={myEntrantId} defaultLocation={defaultLocation} ratingOf={ratingOf} />}
       {tab === "matches" && <MatchesTab sport={sport} matches={matches} resultsByMatch={resultsByMatch} name={name} myEntrantId={myEntrantId} scoringFormat={scoringFormat} deltaByMatch={deltaByMatch} />}
@@ -290,7 +290,7 @@ export function LeagueClient({ leagueSeasonId, sport, myEntrantId, entrantNames,
   );
 }
 
-function RankingsTab({ standings, name, myEntrantId, ratingOf }: { standings: StandingsRow[]; name: (id: string) => string; myEntrantId: string | null; ratingOf: (id: string) => string | null }) {
+function RankingsTab({ standings, name, avatar, myEntrantId, ratingOf }: { standings: StandingsRow[]; name: (id: string) => string; avatar: (id: string) => string | null; myEntrantId: string | null; ratingOf: (id: string) => string | null }) {
   // Entrants with no matches sit below everyone who has played, so their rank
   // number would be misleading. They get a dash instead.
   const rankFor = (i: number, row: StandingsRow) => (row.played > 0 ? String(i + 1) : "\u2013");
@@ -300,6 +300,7 @@ function RankingsTab({ standings, name, myEntrantId, ratingOf }: { standings: St
       {standings.map((row, i) => (
         <div key={row.entrantId} className="flex items-center gap-4 bg-court-deep rounded-xl px-4 py-3 border border-white/10">
           <span className="font-score text-chalk-dim w-6 text-center">{rankFor(i, row)}</span>
+          <Avatar name={name(row.entrantId)} avatarUrl={avatar(row.entrantId)} />
           <div className="flex-1">
             <div className="text-chalk font-medium">
               {name(row.entrantId)}
