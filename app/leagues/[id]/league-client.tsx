@@ -174,11 +174,20 @@ function useAction() {
   const router = useRouter();
   const [pending, startTransition] = useTransition();
   const [error, setError] = useState("");
-  function run(fn: () => Promise<void>) {
+
+  // Server actions now RETURN their failure reason rather than throwing it.
+  // Next.js replaces the message of anything thrown from a server action with
+  // a generic "omitted in production builds" notice, which is why players were
+  // seeing a wall of text that told them nothing.
+  function run(fn: () => Promise<{ error?: string } | void>) {
     setError("");
     startTransition(async () => {
       try {
-        await fn();
+        const result = await fn();
+        if (result && result.error) {
+          setError(result.error);
+          return;
+        }
         router.refresh();
       } catch (e) {
         setError(e instanceof Error ? e.message : "Something went wrong.");
