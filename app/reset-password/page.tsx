@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
+import { PasswordField } from "@/components/password-field";
 
 export const dynamic = "force-dynamic";
 
@@ -76,21 +77,17 @@ export default function ResetPasswordPage() {
           You&apos;ll be logged in straight after.
         </p>
         <form onSubmit={handleSubmit} className="space-y-3">
-          <input
-            type="password"
+          <PasswordField
+            value={password}
+            onChange={setPassword}
             placeholder="New password"
             autoComplete="new-password"
-            value={password}
-            onChange={(e) => setPassword(e.target.value)}
-            className="w-full bg-court-deep border border-white/10 rounded-lg px-3 py-2 text-sm"
           />
-          <input
-            type="password"
+          <PasswordField
+            value={confirm}
+            onChange={setConfirm}
             placeholder="Confirm new password"
             autoComplete="new-password"
-            value={confirm}
-            onChange={(e) => setConfirm(e.target.value)}
-            className="w-full bg-court-deep border border-white/10 rounded-lg px-3 py-2 text-sm"
           />
           {error && <div className="text-paddle text-xs">{error}</div>}
           <button
