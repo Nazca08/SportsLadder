@@ -1,5 +1,6 @@
 "use client";
 
+import { formatTime, formatDate } from "@/lib/format";
 import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import {
@@ -324,7 +325,7 @@ function OffersTab({ leagueSeasonId, matches, name, avatar, rank, myEntrantId, d
           {mine.length === 0 && <p className="text-chalk-dim text-sm">You haven&apos;t posted an offer.</p>}
           {mine.map((m) => (
             <div key={m.id} className="flex items-center gap-4 bg-court-deep rounded-xl px-4 py-3 border border-white/10 flex-wrap">
-              <div className="flex-1 text-sm">{m.scheduled_date} {m.scheduled_time} &middot; {m.location}</div>
+              <div className="flex-1 text-sm">{formatDate(m.scheduled_date)} {formatTime(m.scheduled_time)} &middot; {m.location}</div>
               <button onClick={() => run(() => cancelMatch(m.id))} className="text-chalk-dim text-xs border border-white/10 rounded-lg px-3 py-1.5">Cancel</button>
             </div>
           ))}
@@ -341,7 +342,7 @@ function OffersTab({ leagueSeasonId, matches, name, avatar, rank, myEntrantId, d
               {name(m.entrant_a_id)}
               {rank(m.entrant_a_id) && <span className="text-ball text-xs font-score ml-1.5">#{rank(m.entrant_a_id)}</span>}
               <RatingBadge rating={ratingOf(m.entrant_a_id)} />
-              {" "}&middot; {m.scheduled_date} {m.scheduled_time} &middot; {m.location}
+              {" "}&middot; {formatDate(m.scheduled_date)} {formatTime(m.scheduled_time)} &middot; {m.location}
             </div>
             <button onClick={() => run(() => acceptOffer(m.id))} className="bg-ball text-ink font-display text-xs font-semibold rounded-lg px-3 py-1.5">Accept</button>
           </div>
@@ -395,7 +396,7 @@ function ChallengesTab({ leagueSeasonId, matches, standings, name, avatar, rank,
               {name(m.entrant_a_id)}
               {rank(m.entrant_a_id) && <span className="text-ball text-xs font-score ml-1.5">#{rank(m.entrant_a_id)}</span>}
               <RatingBadge rating={ratingOf(m.entrant_a_id)} />
-              {" "}challenged you &middot; {m.scheduled_date} {m.scheduled_time}
+              {" "}challenged you &middot; {formatDate(m.scheduled_date)} {formatTime(m.scheduled_time)}
             </div>
             <button onClick={() => run(() => respondChallenge(m.id, true))} className="bg-ball text-ink rounded-lg px-3 py-1.5 text-xs font-display font-semibold">Accept</button>
             <button onClick={() => run(() => respondChallenge(m.id, false))} className="border border-white/10 rounded-lg px-3 py-1.5 text-xs">Decline</button>
@@ -435,7 +436,7 @@ function MatchesTab({ sport, matches, resultsByMatch, name, myEntrantId, scoring
           return (
             <div key={m.id} className="bg-court-deep border border-white/10 rounded-xl p-4 mb-3">
               <div className="text-chalk-dim text-xs mb-2">
-                {name(m.entrant_a_id)} vs {m.entrant_b_id ? name(m.entrant_b_id) : "\u2014"} &middot; {m.scheduled_date} {m.scheduled_time} &middot; {m.location}
+                {name(m.entrant_a_id)} vs {m.entrant_b_id ? name(m.entrant_b_id) : "\u2014"} &middot; {formatDate(m.scheduled_date)} {formatTime(m.scheduled_time)} &middot; {m.location}
               </div>
               {!result && (
                 <ScoreForm sport={sport} scoringFormat={scoringFormat} onSubmit={(payload) => run(() => reportScore(m.id, payload))} />
@@ -465,7 +466,7 @@ function MatchesTab({ sport, matches, resultsByMatch, name, myEntrantId, scoring
           <h3 className="font-display font-semibold mb-3">Disputed</h3>
           {disputed.map((m) => (
             <div key={m.id} className="bg-court-deep border border-paddle/40 rounded-xl p-4 mb-3 text-sm">
-              {name(m.entrant_a_id)} vs {m.entrant_b_id ? name(m.entrant_b_id) : "\u2014"} &middot; {m.scheduled_date} {m.scheduled_time}
+              {name(m.entrant_a_id)} vs {m.entrant_b_id ? name(m.entrant_b_id) : "\u2014"} &middot; {formatDate(m.scheduled_date)} {formatTime(m.scheduled_time)}
               <div className="text-chalk-dim text-xs mt-1">Waiting on an admin to resolve this one.</div>
             </div>
           ))}
