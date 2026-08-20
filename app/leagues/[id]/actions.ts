@@ -8,16 +8,19 @@ import { resolvePickleballMatch, type GameScore } from "@/lib/scoring/pickleball
 import { computePoints } from "@/lib/scoring/points";
 
 async function requireUser() {
+  // Throws rather than returning an error: every caller needs a definite
+  // supabase client and user, and a signed-out visitor never reaches these
+  // actions in the first place.
   const supabase = createClient();
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) throw new Error("Not signed in.");
   return { supabase, user };
 }
 
-export async function createOffer(leagueSeasonId: string, formData: FormData) {
+export async function createOffer(leagueSeasonId: string, formData: FormData): Promise<{ error?: string } | void> {
   const { supabase, user } = await requireUser();
   const entrantId = await getMyEntrantId(supabase, leagueSeasonId, user.id);
-  if (!entrantId) throw new Error("You're not enrolled in this league.");
+  if (!entrantId) return { error: "You're not enrolled in this league." };
 
   const { error } = await supabase.from("matches").insert({
     league_season_id: leagueSeasonId,
@@ -30,42 +33,42 @@ export async function createOffer(leagueSeasonId: string, formData: FormData) {
     location: String(formData.get("location")),
     created_by: user.id,
   });
-  if (error) throw error;
+  if (error) return { error: error.message };
 }
 
-export async function cancelMatch(matchId: string) {
+export async function cancelMatch(matchId: string): Promise<{ error?: string } | void> {
   const { supabase, user } = await requireUser();
   const { error } = await supabase
     .from("matches")
     .update({ status: "cancelled" })
     .eq("id", matchId)
     .eq("created_by", user.id);
-  if (error) throw error;
+  if (error) return { error: error.message };
 }
 
-export async function acceptOffer(matchId: string) {
+export async function acceptOffer(matchId: string): Promise<{ error?: string } | void> {
   const { supabase, user } = await requireUser();
   const { data: match } = await supabase.from("matches").select("*").eq("id", matchId).single();
-  if (!match) throw new Error("Offer not found.");
-  if (match.status !== "open") throw new Error("This offer isn't open anymore.");
+  if (!match) return { error: "Offer not found." };
+  if (match.status !== "open") return { error: "This offer isn't open anymore." };
 
   const entrantId = await getMyEntrantId(supabase, match.league_season_id, user.id);
-  if (!entrantId) throw new Error("You're not enrolled in this league.");
-  if (entrantId === match.entrant_a_id) throw new Error("You can't accept your own offer.");
+  if (!entrantId) return { error: "You're not enrolled in this league." };
+  if (entrantId === match.entrant_a_id) return { error: "You can't accept your own offer." };
 
   const { error } = await supabase
     .from("matches")
     .update({ entrant_b_id: entrantId, status: "scheduled" })
     .eq("id", matchId)
     .eq("status", "open");
-  if (error) throw error;
+  if (error) return { error: error.message };
 }
 
-export async function sendChallenge(leagueSeasonId: string, opponentEntrantId: string, formData: FormData) {
+export async function sendChallenge(leagueSeasonId: string, opponentEntrantId: string, formData: FormData): Promise<{ error?: string } | void> {
   const { supabase, user } = await requireUser();
   const entrantId = await getMyEntrantId(supabase, leagueSeasonId, user.id);
-  if (!entrantId) throw new Error("You're not enrolled in this league.");
-  if (entrantId === opponentEntrantId) throw new Error("You can't challenge yourself.");
+  if (!entrantId) return { error: "You're not enrolled in this league." };
+  if (entrantId === opponentEntrantId) return { error: "You can't challenge yourself." };
 
   const { error } = await supabase.from("matches").insert({
     league_season_id: leagueSeasonId,
@@ -79,36 +82,36 @@ export async function sendChallenge(leagueSeasonId: string, opponentEntrantId: s
     location: String(formData.get("location")),
     created_by: user.id,
   });
-  if (error) throw error;
+  if (error) return { error: error.message };
 }
 
-export async function respondChallenge(matchId: string, accept: boolean) {
+export async function respondChallenge(matchId: string, accept: boolean): Promise<{ error?: string } | void> {
   const { supabase, user } = await requireUser();
   const { data: match } = await supabase.from("matches").select("*").eq("id", matchId).single();
-  if (!match) throw new Error("Challenge not found.");
+  if (!match) return { error: "Challenge not found." };
 
   const entrantId = await getMyEntrantId(supabase, match.league_season_id, user.id);
-  if (entrantId !== match.entrant_b_id) throw new Error("This challenge isn't addressed to you.");
+  if (entrantId !== match.entrant_b_id) return { error: "This challenge isn't addressed to you." };
 
   const { error } = await supabase
     .from("matches")
     .update({ status: accept ? "scheduled" : "declined" })
     .eq("id", matchId)
     .eq("status", "pending");
-  if (error) throw error;
+  if (error) return { error: error.message };
 }
 
 type ScorePayload = { sport: "tennis"; sets: SetScore[] } | { sport: "pickleball"; games: GameScore[] };
 
 /** Either side reports a score. Stays unconfirmed until the opponent confirms (see confirmScore). */
-export async function reportScore(matchId: string, payload: ScorePayload) {
+export async function reportScore(matchId: string, payload: ScorePayload): Promise<{ error?: string } | void> {
   const { supabase, user } = await requireUser();
   const { data: match } = await supabase.from("matches").select("*").eq("id", matchId).single();
-  if (!match) throw new Error("Match not found.");
-  if (match.status !== "scheduled") throw new Error("This match isn't ready to be scored.");
+  if (!match) return { error: "Match not found." };
+  if (match.status !== "scheduled") return { error: "This match isn't ready to be scored." };
 
   const entrantId = await getEntrantIdForUserInMatch(supabase, match, user.id);
-  if (!entrantId) throw new Error("You're not a participant in this match.");
+  if (!entrantId) return { error: "You're not a participant in this match." };
 
   let scoreA: number;
   let scoreB: number;
@@ -129,14 +132,14 @@ export async function reportScore(matchId: string, payload: ScorePayload) {
     const format = (tpl?.scoring_format ?? "standard") as "standard" | "single_set";
 
     const result = resolveTennisMatch(payload.sets, format);
-    if (!result.valid) throw new Error(result.error);
+    if (!result.valid) return { error: result.error };
     scoreA = result.gamesA;
     scoreB = result.gamesB;
     winnerSide = result.winnerSide;
     roundsPlayed = result.sets;
   } else {
     const result = resolvePickleballMatch(payload.games);
-    if (!result.valid) throw new Error(result.error);
+    if (!result.valid) return { error: result.error };
     scoreA = result.scoreA;
     scoreB = result.scoreB;
     winnerSide = result.winnerSide;
@@ -154,23 +157,23 @@ export async function reportScore(matchId: string, payload: ScorePayload) {
     points_b: pointsB,
     reported_by: user.id,
   });
-  if (error) throw error;
+  if (error) return { error: error.message };
 }
 
 /** The non-reporting side confirms the score, which finalizes the match and applies points to standings. */
-export async function confirmScore(matchId: string) {
+export async function confirmScore(matchId: string): Promise<{ error?: string } | void> {
   const { supabase, user } = await requireUser();
   const { data: match } = await supabase.from("matches").select("*").eq("id", matchId).single();
-  if (!match) throw new Error("Match not found.");
+  if (!match) return { error: "Match not found." };
 
   const { data: result } = await supabase.from("match_results").select("*").eq("match_id", matchId).single();
-  if (!result) throw new Error("No score has been reported yet.");
-  if (result.confirmed_by) throw new Error("This score is already confirmed.");
+  if (!result) return { error: "No score has been reported yet." };
+  if (result.confirmed_by) return { error: "This score is already confirmed." };
 
   const myEntrantId = await getEntrantIdForUserInMatch(supabase, match, user.id);
   const reporterEntrantId = await getEntrantIdForUserInMatch(supabase, match, result.reported_by);
-  if (!myEntrantId) throw new Error("You're not a participant in this match.");
-  if (myEntrantId === reporterEntrantId) throw new Error("The reporting side can't also confirm the score.");
+  if (!myEntrantId) return { error: "You're not a participant in this match." };
+  if (myEntrantId === reporterEntrantId) return { error: "The reporting side can't also confirm the score." };
 
   const { error: e1 } = await supabase
     .from("match_results")
@@ -183,13 +186,13 @@ export async function confirmScore(matchId: string) {
 }
 
 /** Rejects a reported score so it can be re-entered, instead of confirming a wrong one. */
-export async function disputeScore(matchId: string) {
+export async function disputeScore(matchId: string): Promise<{ error?: string } | void> {
   const { supabase, user } = await requireUser();
   const { data: match } = await supabase.from("matches").select("*").eq("id", matchId).single();
-  if (!match) throw new Error("Match not found.");
+  if (!match) return { error: "Match not found." };
 
   const myEntrantId = await getEntrantIdForUserInMatch(supabase, match, user.id);
-  if (!myEntrantId) throw new Error("You're not a participant in this match.");
+  if (!myEntrantId) return { error: "You're not a participant in this match." };
 
   const { error: deleteError } = await supabase.from("match_results").delete().eq("match_id", matchId);
   if (deleteError) throw deleteError;
@@ -197,7 +200,7 @@ export async function disputeScore(matchId: string) {
   // Marked disputed (not just reset to scheduled) so an admin can find it and
   // step in -- see app/admin for resolving disputes.
   const { error: statusError } = await supabase.from("matches").update({ status: "disputed" }).eq("id", matchId);
-  if (statusError) throw statusError;
+  if (statusError) return { error: statusError.message };
 }
 
 /** Leaves a league. For a doubles enrollment, this removes the whole team's spot -- see leave_league() for the ownership check. */
