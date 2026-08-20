@@ -51,22 +51,28 @@ export async function getMyEntrantId(
   leagueSeasonId: string,
   userId: string
 ): Promise<string | null> {
-  const { data: directEnrollment } = await supabase
+  // limit(1) rather than maybeSingle(): maybeSingle errors when more than one
+  // row matches, and that error surfaced as "You're not enrolled in this
+  // league" for anyone holding a duplicate enrollment -- telling a player who
+  // was in the league twice that they were not in it at all. A unique index
+  // now prevents duplicates, but the lookup should not be the thing that
+  // breaks if data ever gets messy again.
+  const { data: enrollments } = await supabase
     .from("enrollments")
     .select("player_id")
     .eq("league_season_id", leagueSeasonId)
     .eq("player_id", userId)
-    .maybeSingle();
-  if (directEnrollment) return userId;
+    .limit(1);
+  if (enrollments && enrollments.length > 0) return userId;
 
-  const { data: team } = await supabase
+  const { data: teams } = await supabase
     .from("teams")
     .select("id")
     .eq("league_season_id", leagueSeasonId)
     .or(`player1_id.eq.${userId},player2_id.eq.${userId}`)
-    .maybeSingle();
+    .limit(1);
 
-  return team ? team.id : null;
+  return teams && teams.length > 0 ? (teams[0].id as string) : null;
 }
 
 /**
