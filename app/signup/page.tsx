@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
+import { PasswordField } from "@/components/password-field";
 
 export default function SignupPage() {
   const router = useRouter();
@@ -10,6 +11,7 @@ export default function SignupPage() {
   const [name, setName] = useState("");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
+  const [confirmPassword, setConfirmPassword] = useState("");
   const [gender, setGender] = useState<"male" | "female">("female");
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
@@ -20,6 +22,9 @@ export default function SignupPage() {
     if (!name.trim()) return setError("Enter your name to continue.");
     if (!email.trim()) return setError("Enter your email to continue.");
     if (password.length < 8) return setError("Password must be at least 8 characters.");
+    // Checked before the request: a typo here would otherwise create a real
+    // account with a password the person cannot reproduce.
+    if (password !== confirmPassword) return setError("Those two passwords don't match.");
 
     setError("");
     setLoading(true);
@@ -103,12 +108,17 @@ export default function SignupPage() {
             onChange={(e) => setEmail(e.target.value)}
             className="w-full bg-court-deep border border-white/10 rounded-lg px-3 py-2 text-sm"
           />
-          <input
-            type="password"
-            placeholder="Password"
+          <PasswordField
             value={password}
-            onChange={(e) => setPassword(e.target.value)}
-            className="w-full bg-court-deep border border-white/10 rounded-lg px-3 py-2 text-sm"
+            onChange={setPassword}
+            placeholder="Password"
+            autoComplete="new-password"
+          />
+          <PasswordField
+            value={confirmPassword}
+            onChange={setConfirmPassword}
+            placeholder="Confirm password"
+            autoComplete="new-password"
           />
           <select
             value={gender}
