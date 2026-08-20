@@ -27,7 +27,7 @@ type MatchResult = {
   confirmed_by: string | null;
   reporter_entrant_id: string | null;
 };
-type StandingsRow = { entrantId: string; points: number; wins: number; losses: number; played: number };
+type StandingsRow = { entrantId: string; points: number; seed: number; earned: number; wins: number; losses: number; played: number };
 
 /**
  * Total games (tennis) or points (pickleball) across the whole match.
@@ -269,7 +269,18 @@ function RankingsTab({ standings, name, myEntrantId, ratingOf }: { standings: St
               {row.played > 0 ? `${row.wins}-${row.losses}` : "No matches yet"}
             </div>
           </div>
-          <div className="font-score font-bold text-lg">{row.points}</div>
+          {/* Points earned this season, not the internal seeded score. Blank
+              until the first match: a seed is a handicap, not an achievement,
+              and showing it reads as a score the player never earned. */}
+          <div className="font-score font-bold text-lg">
+            {row.played === 0 ? (
+              <span className="text-chalk-dim font-normal text-sm">&mdash;</span>
+            ) : (
+              <span className={row.earned < 0 ? "text-paddle" : undefined}>
+                {row.earned > 0 ? "+" : ""}{row.earned}
+              </span>
+            )}
+          </div>
         </div>
       ))}
     </div>
