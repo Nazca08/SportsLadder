@@ -41,6 +41,46 @@ function totalsFor(sets: { a: number; b: number }[]): { a: number; b: number } {
   return sets.reduce((acc, s) => ({ a: acc.a + s.a, b: acc.b + s.b }), { a: 0, b: 0 });
 }
 
+/**
+ * Selectable start times, every 15 minutes.
+ *
+ * Replaces <input type="time">, which made players scroll through 1,440
+ * possible minutes to pick 7pm, and which renders as a 24-hour spinner on any
+ * device whose locale says so. A plain select fixes both: the values are
+ * quarter-hours only, and the labels are ours to write.
+ */
+const START_HOUR = 6;   // 6:00am
+const END_HOUR = 22;    // last slot 10:00pm
+
+const TIME_SLOTS = (() => {
+  const slots: { value: string; label: string }[] = [];
+  for (let h = START_HOUR; h <= END_HOUR; h++) {
+    for (const m of [0, 15, 30, 45]) {
+      if (h === END_HOUR && m > 0) break;   // stop cleanly at 10:00pm
+      const value = `${String(h).padStart(2, "0")}:${String(m).padStart(2, "0")}`;
+      const hour12 = h % 12 === 0 ? 12 : h % 12;
+      slots.push({ value, label: `${hour12}:${String(m).padStart(2, "0")}${h < 12 ? "am" : "pm"}` });
+    }
+  }
+  return slots;
+})();
+
+function TimeField() {
+  return (
+    <select
+      name="time"
+      required
+      defaultValue=""
+      className="bg-panel border border-white/10 rounded-lg px-2 py-2 text-sm"
+    >
+      <option value="" disabled>Start time…</option>
+      {TIME_SLOTS.map((slot) => (
+        <option key={slot.value} value={slot.value}>{slot.label}</option>
+      ))}
+    </select>
+  );
+}
+
 /** Rating chip shown beside a name in open leagues. */
 function RatingBadge({ rating }: { rating: string | null }) {
   if (!rating) return null;
@@ -310,7 +350,7 @@ function OffersTab({ leagueSeasonId, matches, name, avatar, rank, myEntrantId, d
       {showForm && (
         <form action={submitOffer} className="bg-court-deep border border-white/10 rounded-xl p-4 mb-4 grid sm:grid-cols-3 gap-3">
           <input name="date" type="date" required className="bg-panel border border-white/10 rounded-lg px-2 py-2 text-sm" />
-          <input name="time" type="time" required className="bg-panel border border-white/10 rounded-lg px-2 py-2 text-sm" />
+          <TimeField />
           <LocationField defaultLocation={defaultLocation} />
           <button type="submit" disabled={pending} className="sm:col-span-3 bg-ball text-ink font-display font-semibold rounded-lg py-2 text-sm">Post offer</button>
         </form>
@@ -379,7 +419,7 @@ function ChallengesTab({ leagueSeasonId, matches, standings, name, avatar, rank,
             ))}
           </select>
           <input name="date" type="date" required className="bg-panel border border-white/10 rounded-lg px-2 py-2 text-sm" />
-          <input name="time" type="time" required className="bg-panel border border-white/10 rounded-lg px-2 py-2 text-sm" />
+          <TimeField />
           <LocationField defaultLocation={defaultLocation} />
           <button type="submit" disabled={pending || !opponentId} className="sm:col-span-4 bg-paddle font-display text-sm font-semibold rounded-lg py-2">Send challenge</button>
         </form>
