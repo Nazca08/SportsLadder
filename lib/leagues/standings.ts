@@ -56,9 +56,12 @@ export async function computeLeagueStandings(
 
   function getRow(id: string): StandingsRow {
     if (!rowsByEntrant.has(id)) {
+      const seed = seedFromRating(ratingById.get(id));
       rowsByEntrant.set(id, {
         entrantId: id,
-        points: seedFromRating(ratingById.get(id)),
+        points: seed,
+        seed,
+        earned: 0,
         wins: 0,
         losses: 0,
         played: 0,
@@ -104,6 +107,9 @@ export async function computeLeagueStandings(
 
     winner.points += exchange;
     loser.points -= exchange;
+    // What the player sees: the seed is a starting handicap, not a score.
+    winner.earned += exchange;
+    loser.earned -= exchange;
     winner.wins++;
     loser.losses++;
     winner.played++;
