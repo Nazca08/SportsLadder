@@ -3,6 +3,7 @@ import { computePoints } from "./points";
 import { isValidSet, resolveTennisMatch } from "./tennis";
 import { resolvePickleballMatch } from "./pickleball";
 import { rankStandings, seedPositions, nextPowerOfTwo, type StandingsRow } from "./standings";
+import { computeExchange, expectedScore, marginMultiplier, seedFromRating, K_FACTOR } from "./elo";
 import { resolveAnnualEntrants, type SeasonQualifiers } from "./annual-championship";
 
 describe("computePoints", () => {
@@ -108,18 +109,18 @@ describe("resolvePickleballMatch", () => {
 describe("rankStandings tiebreaker", () => {
   it("breaks a points tie by fewest losses", () => {
     const rows: StandingsRow[] = [
-      { entrantId: "a", points: 20, wins: 1, losses: 1, beatenEntrantIds: [] },
-      { entrantId: "b", points: 20, wins: 2, losses: 0, beatenEntrantIds: [] },
+      { entrantId: "a", points: 20, wins: 1, losses: 1, played: 1, beatenEntrantIds: [] },
+      { entrantId: "b", points: 20, wins: 2, losses: 0, played: 1, beatenEntrantIds: [] },
     ];
     const ranked = rankStandings(rows);
     expect(ranked[0].entrantId).toBe("b");
   });
   it("falls through to best win by opponent standing when losses and wins also tie", () => {
     const rows: StandingsRow[] = [
-      { entrantId: "a", points: 20, wins: 2, losses: 0, beatenEntrantIds: ["low"] },
-      { entrantId: "b", points: 20, wins: 2, losses: 0, beatenEntrantIds: ["high"] },
-      { entrantId: "low", points: 5, wins: 0, losses: 2, beatenEntrantIds: [] },
-      { entrantId: "high", points: 15, wins: 1, losses: 1, beatenEntrantIds: [] },
+      { entrantId: "a", points: 20, wins: 2, losses: 0, played: 1, beatenEntrantIds: ["low"] },
+      { entrantId: "b", points: 20, wins: 2, losses: 0, played: 1, beatenEntrantIds: ["high"] },
+      { entrantId: "low", points: 5, wins: 0, losses: 2, played: 1, beatenEntrantIds: [] },
+      { entrantId: "high", points: 15, wins: 1, losses: 1, played: 1, beatenEntrantIds: [] },
     ];
     const ranked = rankStandings(rows);
     // "b" beat the higher-standing opponent, so b should rank above a
@@ -248,5 +249,112 @@ describe("single set format", () => {
     expect(computePoints(8, 5)).toEqual({ pointsA: 12, pointsB: 8 });
     // A short 4-2 splits on the same ratio as 8-4 would.
     expect(computePoints(4, 2)).toEqual({ pointsA: 13, pointsB: 7 });
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Zero-sum league scoring
+// ---------------------------------------------------------------------------
+describe("seedFromRating", () => {
+  it("puts 3.5 at the midpoint and scales 100 per rating point", () => {
+    expect(seedFromRating("3.5")).toBe(1000);
+    expect(seedFromRating("2.0")).toBe(850);
+    expect(seedFromRating("5.0")).toBe(1150);
+  });
+
+  it("falls back to the default when no rating is set", () => {
+    expect(seedFromRating(null)).toBe(1000);
+    expect(seedFromRating("")).toBe(1000);
+    expect(seedFromRating("not a number")).toBe(1000);
+  });
+});
+
+describe("expectedScore", () => {
+  it("is even between equal scores", () => {
+    expect(expectedScore(1000, 1000)).toBeCloseTo(0.5, 5);
+  });
+
+  it("strongly favours a 300-point lead", () => {
+    expect(expectedScore(1150, 850)).toBeCloseTo(0.849, 2);
+  });
+
+  it("is symmetric", () => {
+    expect(expectedScore(1150, 850) + expectedScore(850, 1150)).toBeCloseTo(1, 5);
+  });
+});
+
+describe("marginMultiplier", () => {
+  it("is 1 for a dead-even scoreline", () => {
+    expect(marginMultiplier(6, 6)).toBe(1);
+  });
+
+  it("maxes at 1.5 for a shutout", () => {
+    expect(marginMultiplier(8, 0)).toBeCloseTo(1.5, 5);
+  });
+
+  it("handles a match with no games played", () => {
+    expect(marginMultiplier(0, 0)).toBe(1);
+  });
+});
+
+describe("computeExchange", () => {
+  it("pays big for an upset: a 2.0 beating a 5.0", () => {
+    const exchange = computeExchange(850, 1150, 8, 6);
+    expect(exchange).toBeGreaterThan(40);
+    expect(exchange).toBeLessThanOrEqual(K_FACTOR * 1.5);
+  });
+
+  it("pays little for the expected result: a 5.0 beating a 2.0", () => {
+    expect(computeExchange(1150, 850, 8, 1)).toBeLessThan(15);
+  });
+
+  it("pays more for a bigger margin, all else equal", () => {
+    const close = computeExchange(1000, 1000, 8, 7);
+    const thrashing = computeExchange(1000, 1000, 8, 0);
+    expect(thrashing).toBeGreaterThan(close);
+  });
+
+  it("never awards zero, so every match counts for something", () => {
+    // A hopeless mismatch where the favourite scrapes through.
+    expect(computeExchange(2000, 500, 8, 7)).toBeGreaterThanOrEqual(1);
+  });
+
+  it("is zero-sum: what the winner gains, the loser loses", () => {
+    const exchange = computeExchange(1000, 1000, 8, 4);
+    const winnerAfter = 1000 + exchange;
+    const loserAfter = 1000 - exchange;
+    expect(winnerAfter + loserAfter).toBe(2000);
+  });
+});
+
+describe("loss farming is not profitable", () => {
+  it("drops a player who plays five matches and loses them all", () => {
+    let farmer = 1000;
+    let opponent = 1000;
+    for (let i = 0; i < 5; i++) {
+      // Farmer loses narrowly every time -- the old formula rewarded this.
+      const exchange = computeExchange(opponent, farmer, 8, 6);
+      opponent += exchange;
+      farmer -= exchange;
+    }
+    expect(farmer).toBeLessThan(1000);
+  });
+});
+
+describe("rankStandings puts unplayed entrants last", () => {
+  it("ranks an active low scorer above an idle high seed", () => {
+    const rows: StandingsRow[] = [
+      { entrantId: "idle-5.0", points: 1150, wins: 0, losses: 0, played: 0, beatenEntrantIds: [] },
+      { entrantId: "active-3.0", points: 980, wins: 2, losses: 3, played: 5, beatenEntrantIds: [] },
+    ];
+    expect(rankStandings(rows).map((r) => r.entrantId)).toEqual(["active-3.0", "idle-5.0"]);
+  });
+
+  it("keeps seed order among entrants who have not played", () => {
+    const rows: StandingsRow[] = [
+      { entrantId: "idle-2.0", points: 850, wins: 0, losses: 0, played: 0, beatenEntrantIds: [] },
+      { entrantId: "idle-5.0", points: 1150, wins: 0, losses: 0, played: 0, beatenEntrantIds: [] },
+    ];
+    expect(rankStandings(rows).map((r) => r.entrantId)).toEqual(["idle-5.0", "idle-2.0"]);
   });
 });
