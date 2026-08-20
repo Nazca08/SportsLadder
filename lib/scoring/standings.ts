@@ -1,6 +1,16 @@
 export type StandingsRow = {
   entrantId: string;
-  points: number;          // the running league score (zero-sum, seeded from rating)
+  /**
+   * Internal strength score, seeded from the player's self-reported rating.
+   * Never shown: it drives how much each match is worth, nothing else. A
+   * player who has not played yet sits at their seed, which is not a score
+   * they earned and should not be presented as one.
+   */
+  points: number;
+  /** Where this entrant started, so `points - seed` is what they actually earned. */
+  seed: number;
+  /** Points earned this season. This is the number players see and are ranked on. */
+  earned: number;
   wins: number;
   losses: number;
   played: number;          // matches completed; 0 means unranked
@@ -10,15 +20,14 @@ export type StandingsRow = {
 /**
  * Orders a league table.
  *
- * Players who have not played yet sit at the bottom regardless of their seed:
- * a 4.0 who signed up and never turned up should not outrank a 3.0 who has
- * been grinding all season. Among them, seed order still applies, so the group
- * is not arbitrary.
+ * Ranked on points EARNED, not on the internal score. That keeps the order and
+ * the displayed number in agreement -- a table sorted by a figure the player
+ * cannot see is just confusing -- and it stops a high self-rating from being
+ * worth anything on its own. Claiming 5.0 sizes your matches; it does not put
+ * you above someone who has actually won something.
  *
- * Within the played group: score, then fewest losses, then most wins, then the
- * best single win measured by that opponent's own final score. The same
- * function seeds the season-ending bracket and the annual championship groups,
- * so one rule governs everywhere.
+ * Entrants with no matches sit at the bottom regardless, since nobody has
+ * earned anything yet and their seed is not an achievement.
  */
 export function rankStandings(rows: StandingsRow[]): StandingsRow[] {
   const scoreById = Object.fromEntries(rows.map((r) => [r.entrantId, r.points]));
@@ -27,7 +36,7 @@ export function rankStandings(rows: StandingsRow[]): StandingsRow[] {
     const bPlayed = b.played > 0;
     if (aPlayed !== bPlayed) return aPlayed ? -1 : 1;
 
-    if (b.points !== a.points) return b.points - a.points;
+    if (b.earned !== a.earned) return b.earned - a.earned;
     if (a.losses !== b.losses) return a.losses - b.losses;
     if (b.wins !== a.wins) return b.wins - a.wins;
 
