@@ -61,8 +61,16 @@ export default function LoginPage() {
             {loading ? "Logging in\u2026" : "Log in"}
           </button>
         </form>
-        <p className="text-chalk-dim text-xs mt-4">
-          No account yet? <a href="/signup" className="text-ball">Sign up</a>
+        <div className="flex items-center justify-between mt-4">
+          <p className="text-chalk-dim text-xs">
+            No account yet? <a href="/signup" className="text-ball">Sign up</a>
+          </p>
+          <a href="/forgot-password" className="text-chalk-dim text-xs hover:text-chalk">
+            Forgot password?
+          </a>
+        </div>
+        <p className="text-chalk-dim text-xs mt-4 pt-4 border-t border-white/10">
+          Log in with the email you signed up with &mdash; there are no usernames here.
         </p>
         </div>
       </div>
