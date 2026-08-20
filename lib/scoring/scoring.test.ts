@@ -109,18 +109,18 @@ describe("resolvePickleballMatch", () => {
 describe("rankStandings tiebreaker", () => {
   it("breaks a points tie by fewest losses", () => {
     const rows: StandingsRow[] = [
-      { entrantId: "a", points: 20, wins: 1, losses: 1, played: 1, beatenEntrantIds: [] },
-      { entrantId: "b", points: 20, wins: 2, losses: 0, played: 1, beatenEntrantIds: [] },
+      { entrantId: "a", points: 20, seed: 1000, earned: -980, wins: 1, losses: 1, played: 1, beatenEntrantIds: [] },
+      { entrantId: "b", points: 20, seed: 1000, earned: -980, wins: 2, losses: 0, played: 1, beatenEntrantIds: [] },
     ];
     const ranked = rankStandings(rows);
     expect(ranked[0].entrantId).toBe("b");
   });
   it("falls through to best win by opponent standing when losses and wins also tie", () => {
     const rows: StandingsRow[] = [
-      { entrantId: "a", points: 20, wins: 2, losses: 0, played: 1, beatenEntrantIds: ["low"] },
-      { entrantId: "b", points: 20, wins: 2, losses: 0, played: 1, beatenEntrantIds: ["high"] },
-      { entrantId: "low", points: 5, wins: 0, losses: 2, played: 1, beatenEntrantIds: [] },
-      { entrantId: "high", points: 15, wins: 1, losses: 1, played: 1, beatenEntrantIds: [] },
+      { entrantId: "a", points: 20, seed: 1000, earned: -980, wins: 2, losses: 0, played: 1, beatenEntrantIds: ["low"] },
+      { entrantId: "b", points: 20, seed: 1000, earned: -980, wins: 2, losses: 0, played: 1, beatenEntrantIds: ["high"] },
+      { entrantId: "low", points: 5, seed: 1000, earned: -995, wins: 0, losses: 2, played: 1, beatenEntrantIds: [] },
+      { entrantId: "high", points: 15, seed: 1000, earned: -985, wins: 1, losses: 1, played: 1, beatenEntrantIds: [] },
     ];
     const ranked = rankStandings(rows);
     // "b" beat the higher-standing opponent, so b should rank above a
@@ -344,17 +344,38 @@ describe("loss farming is not profitable", () => {
 describe("rankStandings puts unplayed entrants last", () => {
   it("ranks an active low scorer above an idle high seed", () => {
     const rows: StandingsRow[] = [
-      { entrantId: "idle-5.0", points: 1150, wins: 0, losses: 0, played: 0, beatenEntrantIds: [] },
-      { entrantId: "active-3.0", points: 980, wins: 2, losses: 3, played: 5, beatenEntrantIds: [] },
+      { entrantId: "idle-5.0", points: 1150, seed: 1000, earned: 150, wins: 0, losses: 0, played: 0, beatenEntrantIds: [] },
+      { entrantId: "active-3.0", points: 980, seed: 1000, earned: -20, wins: 2, losses: 3, played: 5, beatenEntrantIds: [] },
     ];
     expect(rankStandings(rows).map((r) => r.entrantId)).toEqual(["active-3.0", "idle-5.0"]);
   });
 
   it("keeps seed order among entrants who have not played", () => {
     const rows: StandingsRow[] = [
-      { entrantId: "idle-2.0", points: 850, wins: 0, losses: 0, played: 0, beatenEntrantIds: [] },
-      { entrantId: "idle-5.0", points: 1150, wins: 0, losses: 0, played: 0, beatenEntrantIds: [] },
+      { entrantId: "idle-2.0", points: 850, seed: 1000, earned: -150, wins: 0, losses: 0, played: 0, beatenEntrantIds: [] },
+      { entrantId: "idle-5.0", points: 1150, seed: 1000, earned: 150, wins: 0, losses: 0, played: 0, beatenEntrantIds: [] },
     ];
     expect(rankStandings(rows).map((r) => r.entrantId)).toEqual(["idle-5.0", "idle-2.0"]);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Players are ranked on what they earned, not on their seed
+// ---------------------------------------------------------------------------
+describe("ranking on earned points", () => {
+  it("puts a 2.0 who won above a 5.0 who lost, despite the seeds", () => {
+    const rows: StandingsRow[] = [
+      { entrantId: "the-5.0", points: 1120, seed: 1150, earned: -30, wins: 1, losses: 2, played: 3, beatenEntrantIds: [] },
+      { entrantId: "the-2.0", points: 900, seed: 850, earned: 50, wins: 2, losses: 1, played: 3, beatenEntrantIds: [] },
+    ];
+    expect(rankStandings(rows).map((r) => r.entrantId)).toEqual(["the-2.0", "the-5.0"]);
+  });
+
+  it("keeps an unplayed high seed at the bottom", () => {
+    const rows: StandingsRow[] = [
+      { entrantId: "idle-5.0", points: 1150, seed: 1150, earned: 0, wins: 0, losses: 0, played: 0, beatenEntrantIds: [] },
+      { entrantId: "losing-3.0", points: 900, seed: 950, earned: -50, wins: 0, losses: 3, played: 3, beatenEntrantIds: [] },
+    ];
+    expect(rankStandings(rows).map((r) => r.entrantId)).toEqual(["losing-3.0", "idle-5.0"]);
   });
 });
