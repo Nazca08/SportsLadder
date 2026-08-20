@@ -27,7 +27,7 @@ type MatchResult = {
   confirmed_by: string | null;
   reporter_entrant_id: string | null;
 };
-type StandingsRow = { entrantId: string; points: number; wins: number; losses: number };
+type StandingsRow = { entrantId: string; points: number; wins: number; losses: number; played: number };
 
 /**
  * Total games (tennis) or points (pickleball) across the whole match.
@@ -103,6 +103,7 @@ type Props = {
   entrantRatings: Record<string, string | null>;
   showRatings: boolean;
   scoringFormat: "standard" | "single_set";
+  deltaByMatch: Record<string, { a: number; b: number }>;
   sport: "tennis" | "pickleball";
   myEntrantId: string | null;
   entrantNames: Record<string, string>;
@@ -220,7 +221,7 @@ function ScoreForm({
   );
 }
 
-export function LeagueClient({ leagueSeasonId, sport, myEntrantId, entrantNames, entrantAvatars, standings, matches, resultsByMatch, defaultLocation, entrantRatings, showRatings, scoringFormat }: Props) {
+export function LeagueClient({ leagueSeasonId, sport, myEntrantId, entrantNames, entrantAvatars, standings, matches, resultsByMatch, defaultLocation, entrantRatings, showRatings, scoringFormat, deltaByMatch }: Props) {
   /** Rating badge text for an entrant, or null when this league does not use them. */
   const ratingOf = (id: string) => (showRatings ? entrantRatings[id] ?? null : null);
   const [tab, setTab] = useState<"rankings" | "offers" | "challenges" | "matches">("rankings");
@@ -243,25 +244,30 @@ export function LeagueClient({ leagueSeasonId, sport, myEntrantId, entrantNames,
       {tab === "rankings" && <RankingsTab standings={standings} name={name} myEntrantId={myEntrantId} ratingOf={ratingOf} />}
       {tab === "offers" && <OffersTab leagueSeasonId={leagueSeasonId} matches={matches} name={name} avatar={(id: string) => entrantAvatars[id] ?? null} rank={rank} myEntrantId={myEntrantId} defaultLocation={defaultLocation} ratingOf={ratingOf} />}
       {tab === "challenges" && <ChallengesTab leagueSeasonId={leagueSeasonId} matches={matches} standings={standings} name={name} avatar={(id: string) => entrantAvatars[id] ?? null} rank={rank} myEntrantId={myEntrantId} defaultLocation={defaultLocation} ratingOf={ratingOf} />}
-      {tab === "matches" && <MatchesTab sport={sport} matches={matches} resultsByMatch={resultsByMatch} name={name} myEntrantId={myEntrantId} scoringFormat={scoringFormat} />}
+      {tab === "matches" && <MatchesTab sport={sport} matches={matches} resultsByMatch={resultsByMatch} name={name} myEntrantId={myEntrantId} scoringFormat={scoringFormat} deltaByMatch={deltaByMatch} />}
     </div>
   );
 }
 
 function RankingsTab({ standings, name, myEntrantId, ratingOf }: { standings: StandingsRow[]; name: (id: string) => string; myEntrantId: string | null; ratingOf: (id: string) => string | null }) {
+  // Entrants with no matches sit below everyone who has played, so their rank
+  // number would be misleading. They get a dash instead.
+  const rankFor = (i: number, row: StandingsRow) => (row.played > 0 ? String(i + 1) : "\u2013");
   return (
     <div className="space-y-2">
       {standings.length === 0 && <p className="text-chalk-dim text-sm">No one enrolled yet.</p>}
       {standings.map((row, i) => (
         <div key={row.entrantId} className="flex items-center gap-4 bg-court-deep rounded-xl px-4 py-3 border border-white/10">
-          <span className="font-score text-chalk-dim w-6 text-center">{i + 1}</span>
+          <span className="font-score text-chalk-dim w-6 text-center">{rankFor(i, row)}</span>
           <div className="flex-1">
             <div className="text-chalk font-medium">
               {name(row.entrantId)}
               <RatingBadge rating={ratingOf(row.entrantId)} />
               {row.entrantId === myEntrantId && <span className="text-ball text-xs font-display ml-1">YOU</span>}
             </div>
-            <div className="text-chalk-dim text-xs">{row.wins}-{row.losses}</div>
+            <div className="text-chalk-dim text-xs">
+              {row.played > 0 ? `${row.wins}-${row.losses}` : "No matches yet"}
+            </div>
           </div>
           <div className="font-score font-bold text-lg">{row.points}</div>
         </div>
@@ -400,7 +406,7 @@ function ChallengesTab({ leagueSeasonId, matches, standings, name, avatar, rank,
   );
 }
 
-function MatchesTab({ sport, matches, resultsByMatch, name, myEntrantId, scoringFormat }: { sport: "tennis" | "pickleball"; matches: Match[]; resultsByMatch: Record<string, MatchResult>; name: (id: string) => string; myEntrantId: string | null; scoringFormat: "standard" | "single_set" }) {
+function MatchesTab({ sport, matches, resultsByMatch, name, myEntrantId, scoringFormat, deltaByMatch }: { sport: "tennis" | "pickleball"; matches: Match[]; resultsByMatch: Record<string, MatchResult>; name: (id: string) => string; myEntrantId: string | null; scoringFormat: "standard" | "single_set"; deltaByMatch: Record<string, { a: number; b: number }> }) {
   const { run, error } = useAction();
 
   const scheduled = matches.filter((m) => m.status === "scheduled" && (m.entrant_a_id === myEntrantId || m.entrant_b_id === myEntrantId));
@@ -471,7 +477,12 @@ function MatchesTab({ sport, matches, resultsByMatch, name, myEntrantId, scoring
                   </span>
                 )}
               </div>
-              {result && <div className="text-xs font-score text-chalk-dim">+{result.points_a} / +{result.points_b} pts</div>}
+              {result && deltaByMatch[m.id] && (
+                <div className="text-xs font-score text-chalk-dim">
+                  {deltaByMatch[m.id].a > 0 ? "+" : ""}{deltaByMatch[m.id].a} /{" "}
+                  {deltaByMatch[m.id].b > 0 ? "+" : ""}{deltaByMatch[m.id].b} pts
+                </div>
+              )}
             </div>
           );
         })}
