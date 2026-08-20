@@ -1,5 +1,6 @@
 "use client";
 
+import { formatTime, formatDate } from "@/lib/format";
 import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { adminSetScore, adminResetForReReport } from "./actions";
@@ -81,7 +82,7 @@ export function AdminClient({ matches }: { matches: AdminMatch[] }) {
           <div key={m.id} className="bg-panel border border-paddle/40 rounded-xl p-4 mb-3">
             <div className="text-chalk-dim text-xs mb-1">{m.leagueLabel}</div>
             <div className="text-sm font-medium mb-2">
-              {m.entrantAName} vs {m.entrantBName ?? "\u2014"} &middot; {m.scheduled_date} {m.scheduled_time} &middot; {m.location}
+              {m.entrantAName} vs {m.entrantBName ?? "\u2014"} &middot; {formatDate(m.scheduled_date)} {formatTime(m.scheduled_time)} &middot; {m.location}
             </div>
             <ScoreForm sport={m.sport} onSubmit={(payload) => run(m.id, () => adminSetScore(m.id, payload))} />
             <button
@@ -103,7 +104,7 @@ export function AdminClient({ matches }: { matches: AdminMatch[] }) {
           <div key={m.id} className="bg-panel border border-white/10 rounded-xl p-4 mb-3">
             <div className="text-chalk-dim text-xs mb-1">{m.leagueLabel}</div>
             <div className="text-sm font-medium mb-2">
-              {m.entrantAName} vs {m.entrantBName ?? "\u2014"} &middot; {m.scheduled_date} {m.scheduled_time} &middot; {m.location}
+              {m.entrantAName} vs {m.entrantBName ?? "\u2014"} &middot; {formatDate(m.scheduled_date)} {formatTime(m.scheduled_time)} &middot; {m.location}
             </div>
             <ScoreForm sport={m.sport} onSubmit={(payload) => run(m.id, () => adminSetScore(m.id, payload))} />
             {errors[m.id] && <div className="text-paddle text-xs mt-2">{errors[m.id]}</div>}
