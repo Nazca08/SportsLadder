@@ -1,5 +1,6 @@
 "use client";
 
+import { PasswordField } from "@/components/password-field";
 import { useState } from "react";
 import { createClient } from "@/lib/supabase/client";
 import type { PlayerStats } from "@/lib/leagues/player-stats";
@@ -197,7 +198,14 @@ export function SettingsClient({ userId, email, profile, stats }: Props) {
           <div>
             <label className="text-chalk-dim text-xs font-display uppercase">New password</label>
             <div className="flex gap-2 mt-1">
-              <input type="password" value={newPassword} onChange={(e) => setNewPassword(e.target.value)} placeholder="At least 8 characters" className="flex-1 bg-court-deep border border-white/10 rounded-lg px-3 py-2 text-sm" />
+              <div className="flex-1">
+                <PasswordField
+                  value={newPassword}
+                  onChange={setNewPassword}
+                  placeholder="At least 8 characters"
+                  autoComplete="new-password"
+                />
+              </div>
               <button onClick={handlePasswordChange} className="bg-court-deep border border-white/10 font-display text-sm rounded-lg px-3 py-2 shrink-0">Change password</button>
             </div>
             {passwordError && <div className="text-paddle text-xs mt-1">{passwordError}</div>}
