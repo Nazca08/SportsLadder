@@ -61,7 +61,7 @@ export default async function LeaguePage({
   const entrantNames = await getEntrantNames(supabase, leagueSeasonId);
   const entrantAvatars = await getEntrantAvatars(supabase, leagueSeasonId);
   const entrantRatings = await getEntrantRatings(supabase, leagueSeasonId);
-  const standings = await computeLeagueStandings(supabase, leagueSeasonId);
+  const { rows: standings, deltaByMatch } = await computeLeagueStandings(supabase, leagueSeasonId);
 
   const { data: allMatches } = await supabase
     .from("matches")
@@ -113,6 +113,7 @@ export default async function LeaguePage({
         showRatings={(template as any)?.level === "open"}
         scoringFormat={((template as any)?.scoring_format ?? "standard") as "standard" | "single_set"}
         standings={standings}
+        deltaByMatch={deltaByMatch}
         matches={matches}
         resultsByMatch={Object.fromEntries(resultsByMatch)}
       />
