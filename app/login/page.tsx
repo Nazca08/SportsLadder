@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
+import { PasswordField } from "@/components/password-field";
 
 export default function LoginPage() {
   const router = useRouter();
@@ -44,12 +45,11 @@ export default function LoginPage() {
             onChange={(e) => setEmail(e.target.value)}
             className="w-full bg-court-deep border border-white/10 rounded-lg px-3 py-2 text-sm"
           />
-          <input
-            type="password"
-            placeholder="Password"
+          <PasswordField
             value={password}
-            onChange={(e) => setPassword(e.target.value)}
-            className="w-full bg-court-deep border border-white/10 rounded-lg px-3 py-2 text-sm"
+            onChange={setPassword}
+            placeholder="Password"
+            autoComplete="current-password"
           />
           {error && <div className="text-paddle text-xs">{error}</div>}
           <button
