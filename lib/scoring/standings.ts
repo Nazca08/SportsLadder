@@ -1,25 +1,38 @@
 export type StandingsRow = {
   entrantId: string;
-  points: number;
+  points: number;          // the running league score (zero-sum, seeded from rating)
   wins: number;
   losses: number;
-  beatenEntrantIds: string[]; // ids of entrants this one has beaten
+  played: number;          // matches completed; 0 means unranked
+  beatenEntrantIds: string[];
 };
 
 /**
- * Sorts standings by points desc, then applies the agreed tiebreaker:
- * fewest losses, then most wins, then best win by opponent's own final points.
- * This same function seeds both the season-ending bracket and orders the
- * annual championship's within-group seeding -- one rule, reused everywhere.
+ * Orders a league table.
+ *
+ * Players who have not played yet sit at the bottom regardless of their seed:
+ * a 4.0 who signed up and never turned up should not outrank a 3.0 who has
+ * been grinding all season. Among them, seed order still applies, so the group
+ * is not arbitrary.
+ *
+ * Within the played group: score, then fewest losses, then most wins, then the
+ * best single win measured by that opponent's own final score. The same
+ * function seeds the season-ending bracket and the annual championship groups,
+ * so one rule governs everywhere.
  */
 export function rankStandings(rows: StandingsRow[]): StandingsRow[] {
-  const pointsById = Object.fromEntries(rows.map((r) => [r.entrantId, r.points]));
+  const scoreById = Object.fromEntries(rows.map((r) => [r.entrantId, r.points]));
   return [...rows].sort((a, b) => {
+    const aPlayed = a.played > 0;
+    const bPlayed = b.played > 0;
+    if (aPlayed !== bPlayed) return aPlayed ? -1 : 1;
+
     if (b.points !== a.points) return b.points - a.points;
     if (a.losses !== b.losses) return a.losses - b.losses;
     if (b.wins !== a.wins) return b.wins - a.wins;
-    const bestA = Math.max(0, ...a.beatenEntrantIds.map((id) => pointsById[id] ?? 0));
-    const bestB = Math.max(0, ...b.beatenEntrantIds.map((id) => pointsById[id] ?? 0));
+
+    const bestA = Math.max(0, ...a.beatenEntrantIds.map((id) => scoreById[id] ?? 0));
+    const bestB = Math.max(0, ...b.beatenEntrantIds.map((id) => scoreById[id] ?? 0));
     return bestB - bestA;
   });
 }
