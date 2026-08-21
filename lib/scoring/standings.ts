@@ -1,15 +1,10 @@
 export type StandingsRow = {
   entrantId: string;
-  /**
-   * Internal strength score, seeded from the player's self-reported rating.
-   * Never shown: it drives how much each match is worth, nothing else. A
-   * player who has not played yet sits at their seed, which is not a score
-   * they earned and should not be presented as one.
-   */
+  /** Season points. Same value as `earned`; kept for existing callers. */
   points: number;
-  /** Where this entrant started, so `points - seed` is what they actually earned. */
+  /** Always 0 now that everyone starts a season on nothing. */
   seed: number;
-  /** Points earned this season. This is the number players see and are ranked on. */
+  /** Season points: the number players see and are ranked on. */
   earned: number;
   wins: number;
   losses: number;
@@ -20,14 +15,9 @@ export type StandingsRow = {
 /**
  * Orders a league table.
  *
- * Ranked on points EARNED, not on the internal score. That keeps the order and
- * the displayed number in agreement -- a table sorted by a figure the player
- * cannot see is just confusing -- and it stops a high self-rating from being
- * worth anything on its own. Claiming 5.0 sizes your matches; it does not put
- * you above someone who has actually won something.
- *
- * Entrants with no matches sit at the bottom regardless, since nobody has
- * earned anything yet and their seed is not an achievement.
+ * Ranked on total season points: games won, times two, minus five if you lost.
+ * Entrants with no matches sit at the bottom regardless of anything else --
+ * their zero is an absence of results, not a result.
  */
 export function rankStandings(rows: StandingsRow[]): StandingsRow[] {
   const scoreById = Object.fromEntries(rows.map((r) => [r.entrantId, r.points]));
