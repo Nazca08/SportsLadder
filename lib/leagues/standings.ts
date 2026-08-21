@@ -1,6 +1,6 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { rankStandings, type StandingsRow } from "@/lib/scoring/standings";
-import { computeExchange, seedFromRating } from "@/lib/scoring/elo";
+import { matchPoints, ratingValue } from "@/lib/scoring/elo";
 
 export type LeagueStandings = {
   rows: StandingsRow[];
@@ -9,15 +9,12 @@ export type LeagueStandings = {
 };
 
 /**
- * Replays every completed match in order and returns the resulting table.
+ * Sums the points from every completed match.
  *
- * Order matters here in a way it did not before: under a running sum the total
- * was the same whichever order you added the matches in, but a zero-sum
- * exchange depends on what each player's score was AT THE TIME, so matches are
- * processed oldest first.
- *
- * Nothing is stored. The table is derived from match history on every read,
- * which means a corrected or deleted result cannot leave a stale score behind.
+ * Points depend only on the scoreline, not on who was playing or what their
+ * record was, so order does not matter and no running rating is carried. The
+ * table is derived from match history on every read, so a corrected or deleted
+ * result cannot leave a stale score behind.
  */
 export async function computeLeagueStandings(
   supabase: SupabaseClient,
@@ -39,28 +36,46 @@ export async function computeLeagueStandings(
 
   const resultByMatch = new Map((results ?? []).map((r) => [r.match_id, r]));
 
-  // Seed every entrant from their self-reported rating. Teams and players
-  // without one start at the default.
   const { data: enrollments } = await supabase
     .from("enrollments")
     .select("player_id, team_id")
     .eq("league_season_id", leagueSeasonId);
 
+  // Scoring needs each side's rating. In a level-scoped league everyone is the
+  // same level by definition, so the league's own level is used for all of them
+  // and every gap is zero. Only an open league -- where 2.0s and 5.0s share a
+  // ladder -- reads individual ratings.
+  const { data: leagueSeason } = await supabase
+    .from("league_seasons")
+    .select("league_templates(level)")
+    .eq("id", leagueSeasonId)
+    .maybeSingle();
+  const tpl: any = Array.isArray((leagueSeason as any)?.league_templates)
+    ? (leagueSeason as any).league_templates[0]
+    : (leagueSeason as any)?.league_templates;
+  const leagueLevel = tpl?.level ?? "open";
+  const isOpenLeague = leagueLevel === "open";
+
   const playerIds = (enrollments ?? []).map((e) => e.player_id).filter(Boolean) as string[];
-  const { data: profiles } = playerIds.length
+  const { data: profiles } = isOpenLeague && playerIds.length
     ? await supabase.from("profiles").select("id, rating").in("id", playerIds)
     : { data: [] as { id: string; rating: string | null }[] };
   const ratingById = new Map((profiles ?? []).map((p) => [p.id, (p as any).rating ?? null]));
+
+  /** A player's rating for scoring purposes. */
+  const ratingOf = (entrantId: string): number =>
+    isOpenLeague ? ratingValue(ratingById.get(entrantId)) : ratingValue(leagueLevel);
 
   const rowsByEntrant = new Map<string, StandingsRow>();
 
   function getRow(id: string): StandingsRow {
     if (!rowsByEntrant.has(id)) {
-      const seed = seedFromRating(ratingById.get(id));
       rowsByEntrant.set(id, {
         entrantId: id,
-        points: seed,
-        seed,
+        // Everyone starts a season on nothing. Kept alongside `earned` so the
+        // rest of the app keeps working; both now mean the same thing.
+        points: 0,
+        seed: 0,
         earned: 0,
         wins: 0,
         losses: 0,
@@ -103,20 +118,26 @@ export async function computeLeagueStandings(
     const winnerGames = aWon ? gamesA : gamesB;
     const loserGames = aWon ? gamesB : gamesA;
 
-    const exchange = computeExchange(winner.points, loser.points, winnerGames, loserGames);
+    const { winner: winnerPts, loser: loserPts } = matchPoints(
+      winnerGames,
+      loserGames,
+      ratingOf(winner.entrantId),
+      ratingOf(loser.entrantId)
+    );
 
-    winner.points += exchange;
-    loser.points -= exchange;
-    // What the player sees: the seed is a starting handicap, not a score.
-    winner.earned += exchange;
-    loser.earned -= exchange;
+    winner.points += winnerPts;
+    loser.points += loserPts;
+    winner.earned += winnerPts;
+    loser.earned += loserPts;
     winner.wins++;
     loser.losses++;
     winner.played++;
     loser.played++;
     winner.beatenEntrantIds.push(loser.entrantId);
 
-    deltaByMatch[m.id] = aWon ? { a: exchange, b: -exchange } : { a: -exchange, b: exchange };
+    deltaByMatch[m.id] = aWon
+      ? { a: winnerPts, b: loserPts }
+      : { a: loserPts, b: winnerPts };
   });
 
   return { rows: rankStandings(Array.from(rowsByEntrant.values())), deltaByMatch };
