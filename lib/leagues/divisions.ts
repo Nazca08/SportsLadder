@@ -2,14 +2,16 @@ export type Gender = "male" | "female";
 export type Format = "singles" | "doubles";
 export type Division = "mens" | "womens" | "mixed";
 
-/** Mixed only exists for doubles; singles is always your own gender's division. */
+/**
+ * Mixed is now offered for singles as well as doubles.
+ *
+ * In doubles it means a man and a woman on the same side. In singles it means
+ * one draw that men and women both enter -- a different thing wearing the same
+ * name, but the one clubs use.
+ */
 export function divisionOptions(gender: Gender, format: Format): [Division, string][] {
-  if (format === "doubles") {
-    return gender === "male"
-      ? [["mens", "Men's"], ["mixed", "Mixed"]]
-      : [["womens", "Women's"], ["mixed", "Mixed"]];
-  }
-  return gender === "male" ? [["mens", "Men's"]] : [["womens", "Women's"]];
+  const own: [Division, string] = gender === "male" ? ["mens", "Men's"] : ["womens", "Women's"];
+  return [own, ["mixed", "Mixed"]];
 }
 
 export const SPORTS = ["tennis", "pickleball"] as const;
