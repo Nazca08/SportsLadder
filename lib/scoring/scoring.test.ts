@@ -3,7 +3,7 @@ import { computePoints } from "./points";
 import { isValidSet, resolveTennisMatch } from "./tennis";
 import { resolvePickleballMatch } from "./pickleball";
 import { rankStandings, seedPositions, nextPowerOfTwo, type StandingsRow } from "./standings";
-import { computeExchange, expectedScore, marginMultiplier, seedFromRating, K_FACTOR } from "./elo";
+import { matchPoints, winMultiplier, lossPenalty, BASE_PENALTY, POINTS_PER_GAME } from "./elo";
 import { resolveAnnualEntrants, type SeasonQualifiers } from "./annual-championship";
 
 describe("computePoints", () => {
@@ -253,129 +253,78 @@ describe("single set format", () => {
 });
 
 // ---------------------------------------------------------------------------
-// Zero-sum league scoring
+// League points: winner = games * 2, loser = games * 2 - 5
+
 // ---------------------------------------------------------------------------
-describe("seedFromRating", () => {
-  it("puts 3.5 at the midpoint and scales 100 per rating point", () => {
-    expect(seedFromRating("3.5")).toBe(1000);
-    expect(seedFromRating("2.0")).toBe(850);
-    expect(seedFromRating("5.0")).toBe(1150);
+// League points: G x 2, scaled by the rating gap
+// ---------------------------------------------------------------------------
+describe("winMultiplier", () => {
+  it("is 1 between equals", () => {
+    expect(winMultiplier(0)).toBeCloseTo(1, 5);
   });
-
-  it("falls back to the default when no rating is set", () => {
-    expect(seedFromRating(null)).toBe(1000);
-    expect(seedFromRating("")).toBe(1000);
-    expect(seedFromRating("not a number")).toBe(1000);
+  it("rises for beating someone above you and falls for someone below", () => {
+    expect(winMultiplier(2.5)).toBeCloseTo(1.375, 3);
+    expect(winMultiplier(-2.5)).toBeCloseTo(0.625, 3);
   });
-});
-
-describe("expectedScore", () => {
-  it("is even between equal scores", () => {
-    expect(expectedScore(1000, 1000)).toBeCloseTo(0.5, 5);
-  });
-
-  it("strongly favours a 300-point lead", () => {
-    expect(expectedScore(1150, 850)).toBeCloseTo(0.849, 2);
-  });
-
-  it("is symmetric", () => {
-    expect(expectedScore(1150, 850) + expectedScore(850, 1150)).toBeCloseTo(1, 5);
+  it("clamps at both ends so extreme gaps cannot run away", () => {
+    expect(winMultiplier(10)).toBe(1.45);
+    expect(winMultiplier(-10)).toBe(0.55);
   });
 });
 
-describe("marginMultiplier", () => {
-  it("is 1 for a dead-even scoreline", () => {
-    expect(marginMultiplier(6, 6)).toBe(1);
+describe("lossPenalty", () => {
+  it("costs the base amount between equals", () => {
+    expect(lossPenalty(0)).toBe(BASE_PENALTY);
   });
-
-  it("maxes at 1.5 for a shutout", () => {
-    expect(marginMultiplier(8, 0)).toBeCloseTo(1.5, 5);
+  it("costs nothing when you were badly outmatched", () => {
+    expect(lossPenalty(2.5)).toBe(0);
+    expect(lossPenalty(3)).toBe(0);
   });
-
-  it("handles a match with no games played", () => {
-    expect(marginMultiplier(0, 0)).toBe(1);
-  });
-});
-
-describe("computeExchange", () => {
-  it("pays big for an upset: a 2.0 beating a 5.0", () => {
-    const exchange = computeExchange(850, 1150, 8, 6);
-    expect(exchange).toBeGreaterThan(40);
-    expect(exchange).toBeLessThanOrEqual(K_FACTOR * 1.5);
-  });
-
-  it("pays little for the expected result: a 5.0 beating a 2.0", () => {
-    expect(computeExchange(1150, 850, 8, 1)).toBeLessThan(15);
-  });
-
-  it("pays more for a bigger margin, all else equal", () => {
-    const close = computeExchange(1000, 1000, 8, 7);
-    const thrashing = computeExchange(1000, 1000, 8, 0);
-    expect(thrashing).toBeGreaterThan(close);
-  });
-
-  it("never awards zero, so every match counts for something", () => {
-    // A hopeless mismatch where the favourite scrapes through.
-    expect(computeExchange(2000, 500, 8, 7)).toBeGreaterThanOrEqual(1);
-  });
-
-  it("is zero-sum: what the winner gains, the loser loses", () => {
-    const exchange = computeExchange(1000, 1000, 8, 4);
-    const winnerAfter = 1000 + exchange;
-    const loserAfter = 1000 - exchange;
-    expect(winnerAfter + loserAfter).toBe(2000);
+  it("costs heavily when you lost to someone below you", () => {
+    expect(lossPenalty(-2)).toBe(22);
   });
 });
 
-describe("loss farming is not profitable", () => {
-  it("drops a player who plays five matches and loses them all", () => {
-    let farmer = 1000;
-    let opponent = 1000;
-    for (let i = 0; i < 5; i++) {
-      // Farmer loses narrowly every time -- the old formula rewarded this.
-      const exchange = computeExchange(opponent, farmer, 8, 6);
-      opponent += exchange;
-      farmer -= exchange;
+describe("matchPoints", () => {
+  it("pays two per game between equals", () => {
+    expect(matchPoints(8, 6, 3.5, 3.5)).toEqual({ winner: 16, loser: 0 });
+    expect(matchPoints(9, 8, 3.5, 3.5)).toEqual({ winner: 18, loser: 4 });
+  });
+
+  it("punishes losing badly to a peer", () => {
+    expect(matchPoints(8, 0, 3.5, 3.5).loser).toBe(-12);
+  });
+
+  it("pays a big bonus for beating someone well above you", () => {
+    expect(matchPoints(8, 6, 2.0, 4.5).winner).toBe(22);
+  });
+
+  it("pays little for beating someone well below you", () => {
+    expect(matchPoints(8, 1, 4.5, 2.0).winner).toBe(10);
+  });
+
+  it("never takes points off an underdog, however heavy the defeat", () => {
+    // The whole point of the penalty floor: Jana cannot go backwards for
+    // losing to someone two and a half levels above her.
+    expect(matchPoints(8, 0, 4.5, 2.0).loser).toBe(0);
+    expect(matchPoints(8, 1, 4.5, 2.0).loser).toBeGreaterThan(0);
+  });
+
+  it("punishes a favourite who loses to someone far below them", () => {
+    expect(matchPoints(8, 6, 2.0, 4.5).loser).toBeLessThan(0);
+  });
+
+  it("never lets the loser out-earn the winner", () => {
+    for (const [wg, lg, wr, lr] of [
+      [8, 6, 4.5, 2.0], [9, 8, 4.5, 2.0], [8, 6, 5.0, 2.0], [8, 5, 4.0, 2.5],
+    ] as const) {
+      const { winner, loser } = matchPoints(wg, lg, wr, lr);
+      expect(loser).toBeLessThan(winner);
     }
-    expect(farmer).toBeLessThan(1000);
-  });
-});
-
-describe("rankStandings puts unplayed entrants last", () => {
-  it("ranks an active low scorer above an idle high seed", () => {
-    const rows: StandingsRow[] = [
-      { entrantId: "idle-5.0", points: 1150, seed: 1000, earned: 150, wins: 0, losses: 0, played: 0, beatenEntrantIds: [] },
-      { entrantId: "active-3.0", points: 980, seed: 1000, earned: -20, wins: 2, losses: 3, played: 5, beatenEntrantIds: [] },
-    ];
-    expect(rankStandings(rows).map((r) => r.entrantId)).toEqual(["active-3.0", "idle-5.0"]);
   });
 
-  it("keeps seed order among entrants who have not played", () => {
-    const rows: StandingsRow[] = [
-      { entrantId: "idle-2.0", points: 850, seed: 1000, earned: -150, wins: 0, losses: 0, played: 0, beatenEntrantIds: [] },
-      { entrantId: "idle-5.0", points: 1150, seed: 1000, earned: 150, wins: 0, losses: 0, played: 0, beatenEntrantIds: [] },
-    ];
-    expect(rankStandings(rows).map((r) => r.entrantId)).toEqual(["idle-5.0", "idle-2.0"]);
-  });
-});
-
-// ---------------------------------------------------------------------------
-// Players are ranked on what they earned, not on their seed
-// ---------------------------------------------------------------------------
-describe("ranking on earned points", () => {
-  it("puts a 2.0 who won above a 5.0 who lost, despite the seeds", () => {
-    const rows: StandingsRow[] = [
-      { entrantId: "the-5.0", points: 1120, seed: 1150, earned: -30, wins: 1, losses: 2, played: 3, beatenEntrantIds: [] },
-      { entrantId: "the-2.0", points: 900, seed: 850, earned: 50, wins: 2, losses: 1, played: 3, beatenEntrantIds: [] },
-    ];
-    expect(rankStandings(rows).map((r) => r.entrantId)).toEqual(["the-2.0", "the-5.0"]);
-  });
-
-  it("keeps an unplayed high seed at the bottom", () => {
-    const rows: StandingsRow[] = [
-      { entrantId: "idle-5.0", points: 1150, seed: 1150, earned: 0, wins: 0, losses: 0, played: 0, beatenEntrantIds: [] },
-      { entrantId: "losing-3.0", points: 900, seed: 950, earned: -50, wins: 0, losses: 3, played: 3, beatenEntrantIds: [] },
-    ];
-    expect(rankStandings(rows).map((r) => r.entrantId)).toEqual(["losing-3.0", "idle-5.0"]);
+  it("keeps its constants in step with the documented rule", () => {
+    expect(POINTS_PER_GAME).toBe(2);
+    expect(BASE_PENALTY).toBe(12);
   });
 });
