@@ -5,7 +5,7 @@ export type SetScore = { a: number; b: number };
  *   standard   - conventional sets (6-0..6-4, 7-5, 7-6), any number of them
  *   single_set - one set, any score accepted
  */
-export type TennisFormat = "standard" | "single_set";
+export type TennisFormat = "standard" | "single_set" | "best_of_3_avg";
 
 export type TennisResult =
   | { valid: true; winnerSide: "a" | "b"; gamesA: number; gamesB: number; sets: SetScore[] }
@@ -21,7 +21,10 @@ export type TennisResult =
 export function isValidSet(a: number, b: number, format: TennisFormat = "standard"): boolean {
   if (a < 0 || b < 0) return false;
 
-  if (format === "single_set") return true;
+  // Permissive formats accept whatever was actually played. Matches get cut
+  // short by rain, injury and daylight, and a validator that rejects 4-2 just
+  // means the result never gets recorded.
+  if (format === "single_set" || format === "best_of_3_avg") return true;
 
   const max = Math.max(a, b);
   const min = Math.min(a, b);
@@ -49,6 +52,10 @@ export function resolveTennisMatch(
 
   // The set IS the match in this format, so extra rows are a misunderstanding
   // rather than a longer match.
+  if (format === "best_of_3_avg" && sets.length > 3) {
+    return { valid: false, error: "This league plays best of three \u2014 enter at most three sets." };
+  }
+
   if (format === "single_set" && sets.length !== 1) {
     return { valid: false, error: "This league plays one set \u2014 enter a single score." };
   }
