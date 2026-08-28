@@ -111,7 +111,7 @@ export default async function LeaguePage({
         entrantAvatars={Object.fromEntries(entrantAvatars)}
         entrantRatings={Object.fromEntries(entrantRatings)}
         showRatings={(template as any)?.level === "open"}
-        scoringFormat={((template as any)?.scoring_format ?? "standard") as "standard" | "single_set"}
+        scoringFormat={((template as any)?.scoring_format ?? "standard") as "standard" | "single_set" | "best_of_3_avg"}
         standings={standings}
         deltaByMatch={deltaByMatch}
         matches={matches}
