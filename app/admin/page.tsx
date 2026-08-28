@@ -177,7 +177,7 @@ export default async function AdminPage() {
     entrantBName: m.entrant_b_id ? nameById.get(m.entrant_b_id) ?? "Unknown" : null,
     leagueLabel: leagueLabelBySeasonId.get(m.league_season_id) ?? "Unknown league",
     sport: (sportBySeasonId.get(m.league_season_id) ?? "tennis") as "tennis" | "pickleball",
-    scoringFormat: ((templateOf(m.league_season_id)?.scoring_format ?? "standard") as "standard" | "single_set"),
+    scoringFormat: ((templateOf(m.league_season_id)?.scoring_format ?? "standard") as "standard" | "single_set" | "best_of_3_avg"),
   }));
 
   return (
