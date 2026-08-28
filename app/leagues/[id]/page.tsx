@@ -8,6 +8,7 @@ import { AREAS } from "@/lib/leagues/divisions";
 import { LeagueClient } from "./league-client";
 import { PaymentGate } from "./payment-gate";
 import { leagueLabel, areaShortName } from "@/lib/leagues/label";
+import { LeagueBadge, FormatChip } from "@/components/league-badge";
 
 const areaName = (code?: string) => AREAS.find(([c]) => c === code)?.[1] ?? code;
 
@@ -94,7 +95,15 @@ export default async function LeaguePage({
   return (
     <main className="min-h-screen p-6 max-w-4xl mx-auto">
       <div className="flex items-center justify-between mb-1 flex-wrap gap-2">
-        <h1 className="font-display text-2xl font-bold">{template ? leagueLabel(template as any) : "League"}</h1>
+        <h1 className="font-display text-2xl font-bold flex items-center gap-3">
+          <LeagueBadge
+            sport={(template as any)?.sport ?? "tennis"}
+            division={(template as any)?.division ?? "mixed"}
+            size={30}
+          />
+          {template ? leagueLabel(template as any) : "League"}
+          <FormatChip format={(template as any)?.format ?? "singles"} />
+        </h1>
         <div className="flex items-center gap-4">
           <a href="/dashboard" className="text-chalk-dim text-sm hover:text-chalk">&larr; All leagues</a>
           <a href="/settings" className="text-chalk-dim text-sm hover:text-chalk">Settings</a>
