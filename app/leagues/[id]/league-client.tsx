@@ -143,7 +143,7 @@ type Props = {
   defaultLocation: string;
   entrantRatings: Record<string, string | null>;
   showRatings: boolean;
-  scoringFormat: "standard" | "single_set";
+  scoringFormat: "standard" | "single_set" | "best_of_3_avg";
   deltaByMatch: Record<string, { a: number; b: number }>;
   sport: "tennis" | "pickleball";
   myEntrantId: string | null;
@@ -204,11 +204,14 @@ function ScoreForm({
 }: {
   sport: "tennis" | "pickleball";
   onSubmit: (payload: any) => void;
-  scoringFormat?: "standard" | "single_set";
+  scoringFormat?: "standard" | "single_set" | "best_of_3_avg";
 }) {
   // A pro set is the whole match, so the form opens with one row and does not
   // offer to add more.
   const singleSet = sport === "tennis" && scoringFormat === "single_set";
+  // Best of three: two rows to start, a third available, no more.
+  const bestOfThree = scoringFormat === "best_of_3_avg";
+  const maxRounds = bestOfThree ? 3 : 99;
   const [rounds, setRounds] = useState(
     singleSet ? [{ a: "", b: "" }] : [{ a: "", b: "" }, { a: "", b: "" }]
   );
@@ -247,6 +250,12 @@ function ScoreForm({
           </div>
         ))}
       </div>
+      {bestOfThree && (
+        <p className="text-chalk-dim text-xs mb-2">
+          Best of three. {sport === "pickleball" ? "Games to 11, win by 2." : ""} Enter
+          only the ones you played &mdash; a match cut short still counts.
+        </p>
+      )}
       {singleSet && (
         <p className="text-chalk-dim text-xs mb-2">
           One set. Enter the games as played &mdash; any score is fine, including a
@@ -254,7 +263,7 @@ function ScoreForm({
         </p>
       )}
       <div className="flex items-center gap-3">
-        {!singleSet && (
+        {!singleSet && rounds.length < maxRounds && (
           <button type="button" onClick={addRound} className="text-ball text-xs font-display">
             + Add another {label.toLowerCase()}
           </button>
@@ -468,7 +477,7 @@ function ChallengesTab({ leagueSeasonId, matches, standings, name, avatar, rank,
   );
 }
 
-function MatchesTab({ sport, matches, resultsByMatch, name, myEntrantId, scoringFormat, deltaByMatch }: { sport: "tennis" | "pickleball"; matches: Match[]; resultsByMatch: Record<string, MatchResult>; name: (id: string) => string; myEntrantId: string | null; scoringFormat: "standard" | "single_set"; deltaByMatch: Record<string, { a: number; b: number }> }) {
+function MatchesTab({ sport, matches, resultsByMatch, name, myEntrantId, scoringFormat, deltaByMatch }: { sport: "tennis" | "pickleball"; matches: Match[]; resultsByMatch: Record<string, MatchResult>; name: (id: string) => string; myEntrantId: string | null; scoringFormat: "standard" | "single_set" | "best_of_3_avg"; deltaByMatch: Record<string, { a: number; b: number }> }) {
   const { run, error } = useAction();
 
   const scheduled = matches.filter((m) => m.status === "scheduled" && (m.entrant_a_id === myEntrantId || m.entrant_b_id === myEntrantId));
