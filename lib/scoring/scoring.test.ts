@@ -1,7 +1,7 @@
 import { describe, it, expect } from "vitest";
 import { computePoints } from "./points";
 import { isValidSet, resolveTennisMatch } from "./tennis";
-import { resolvePickleballMatch } from "./pickleball";
+import { resolvePickleballMatch, isValidGame } from "./pickleball";
 import { rankStandings, seedPositions, nextPowerOfTwo, type StandingsRow } from "./standings";
 import { matchPoints, winMultiplier, lossPenalty, BASE_PENALTY, POINTS_PER_GAME } from "./elo";
 import { resolveAnnualEntrants, type SeasonQualifiers } from "./annual-championship";
@@ -326,5 +326,86 @@ describe("matchPoints", () => {
   it("keeps its constants in step with the documented rule", () => {
     expect(POINTS_PER_GAME).toBe(2);
     expect(BASE_PENALTY).toBe(12);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Dallas: best of three, averaged
+// ---------------------------------------------------------------------------
+describe("best_of_3_avg format", () => {
+  it("accepts a normal pickleball game", () => {
+    expect(isValidGame(11, 5, "best_of_3_avg")).toBe(true);
+  });
+
+  it("accepts a game cut short, which standard rules reject", () => {
+    expect(isValidGame(6, 3, "best_of_3_avg")).toBe(true);
+    expect(isValidGame(6, 3, "standard")).toBe(false);
+  });
+
+  it("still refuses negative scores, which are typos not results", () => {
+    expect(isValidGame(-1, 5, "best_of_3_avg")).toBe(false);
+  });
+
+  it("resolves a two-game win", () => {
+    const r = resolvePickleballMatch([{ a: 11, b: 5 }, { a: 11, b: 7 }], "best_of_3_avg");
+    expect(r.valid).toBe(true);
+    if (r.valid) expect(r.winnerSide).toBe("a");
+  });
+
+  it("resolves a three-game win", () => {
+    const r = resolvePickleballMatch(
+      [{ a: 11, b: 5 }, { a: 9, b: 11 }, { a: 11, b: 8 }],
+      "best_of_3_avg"
+    );
+    expect(r.valid).toBe(true);
+    if (r.valid) expect(r.winnerSide).toBe("a");
+  });
+
+  it("refuses a fourth game", () => {
+    const r = resolvePickleballMatch(
+      [{ a: 11, b: 5 }, { a: 11, b: 7 }, { a: 11, b: 9 }, { a: 11, b: 3 }],
+      "best_of_3_avg"
+    );
+    expect(r.valid).toBe(false);
+  });
+
+  it("refuses a drawn match, which cannot be scored", () => {
+    const r = resolvePickleballMatch([{ a: 11, b: 5 }, { a: 5, b: 11 }], "best_of_3_avg");
+    expect(r.valid).toBe(false);
+  });
+
+  it("tennis accepts up to three sets and rejects a fourth", () => {
+    expect(resolveTennisMatch([{ a: 6, b: 4 }, { a: 4, b: 6 }, { a: 6, b: 3 }], "best_of_3_avg").valid).toBe(true);
+    expect(resolveTennisMatch(
+      [{ a: 6, b: 4 }, { a: 4, b: 6 }, { a: 6, b: 3 }, { a: 6, b: 0 }], "best_of_3_avg"
+    ).valid).toBe(false);
+  });
+});
+
+describe("averaging makes two- and three-game matches comparable", () => {
+  // The averaging itself lives in computeLeagueStandings; this pins the maths
+  // it performs so a change there cannot silently alter the scoring.
+  const avg = (sets: { a: number; b: number }[], side: "a" | "b") =>
+    sets.reduce((s, g) => s + g[side], 0) / sets.length;
+
+  it("a straight-games win and a three-game win score alike", () => {
+    const twoGame = [{ a: 11, b: 5 }, { a: 11, b: 7 }];
+    const threeGame = [{ a: 11, b: 5 }, { a: 9, b: 11 }, { a: 11, b: 8 }];
+
+    // Summing would pay the three-gamer 31 against 22 for going the distance.
+    expect(twoGame.reduce((s, g) => s + g.a, 0)).toBe(22);
+    expect(threeGame.reduce((s, g) => s + g.a, 0)).toBe(31);
+
+    // Averaged, they sit within a point of each other.
+    expect(avg(twoGame, "a")).toBe(11);
+    expect(avg(threeGame, "a")).toBeCloseTo(10.33, 1);
+  });
+
+  it("feeds matchPoints a per-game figure, not a total", () => {
+    const sets = [{ a: 11, b: 5 }, { a: 9, b: 11 }, { a: 11, b: 8 }];
+    const pts = matchPoints(avg(sets, "a"), avg(sets, "b"), 3.5, 3.5);
+    // 10.33 * 2 = 20.7 -> 21 for the winner; 8 * 2 - 12 = 4 for the loser.
+    expect(pts.winner).toBe(21);
+    expect(pts.loser).toBe(4);
   });
 });
