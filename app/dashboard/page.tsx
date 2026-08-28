@@ -3,6 +3,7 @@ import { createClient } from "@/lib/supabase/server";
 import { SignOutButton } from "@/components/sign-out-button";
 import { AREAS } from "@/lib/leagues/divisions";
 import { leagueLabel } from "@/lib/leagues/label";
+import { LeagueBadge, FormatChip } from "@/components/league-badge";
 
 const areaName = (code?: string) => AREAS.find(([c]) => c === code)?.[1] ?? code;
 
@@ -67,9 +68,14 @@ export default async function DashboardPage() {
             <a
               key={e.id}
               href={`/leagues/${e.id}`}
-              className="block bg-panel border border-white/10 rounded-xl px-4 py-3 hover:border-ball transition"
+              className="flex items-center gap-3 bg-panel border border-white/10 rounded-xl px-4 py-3 hover:border-ball transition"
             >
-              {template ? leagueLabel(template) : "League"}
+              <LeagueBadge
+                sport={(template as any)?.sport ?? "tennis"}
+                division={(template as any)?.division ?? "mixed"}
+              />
+              <span className="flex-1 min-w-0">{template ? leagueLabel(template) : "League"}</span>
+              <FormatChip format={(template as any)?.format ?? "singles"} />
             </a>
           );
         })}
