@@ -47,7 +47,7 @@ export async function computeLeagueStandings(
   // ladder -- reads individual ratings.
   const { data: leagueSeason } = await supabase
     .from("league_seasons")
-    .select("league_templates(level)")
+    .select("league_templates(level, scoring_format)")
     .eq("id", leagueSeasonId)
     .maybeSingle();
   const tpl: any = Array.isArray((leagueSeason as any)?.league_templates)
@@ -55,6 +55,11 @@ export async function computeLeagueStandings(
     : (leagueSeason as any)?.league_templates;
   const leagueLevel = tpl?.level ?? "open";
   const isOpenLeague = leagueLevel === "open";
+
+  // best_of_3_avg leagues average across the sets played instead of summing
+  // them. A three-gamer is not worth half as much again as a two-gamer just
+  // for having gone the distance -- what counts is how you played per game.
+  const averageSets = (tpl?.scoring_format ?? "standard") === "best_of_3_avg";
 
   const playerIds = (enrollments ?? []).map((e) => e.player_id).filter(Boolean) as string[];
   const { data: profiles } = isOpenLeague && playerIds.length
@@ -109,8 +114,11 @@ export async function computeLeagueStandings(
     const rowB = getRow(m.entrant_b_id);
 
     const sets = (result.sets ?? []) as { a: number; b: number }[];
-    const gamesA = sets.reduce((sum, s) => sum + (s.a ?? 0), 0);
-    const gamesB = sets.reduce((sum, s) => sum + (s.b ?? 0), 0);
+    const totalA = sets.reduce((sum, s) => sum + (s.a ?? 0), 0);
+    const totalB = sets.reduce((sum, s) => sum + (s.b ?? 0), 0);
+    const divisor = averageSets && sets.length > 0 ? sets.length : 1;
+    const gamesA = totalA / divisor;
+    const gamesB = totalB / divisor;
 
     const aWon = result.winner_entrant_id === m.entrant_a_id;
     const winner = aWon ? rowA : rowB;
