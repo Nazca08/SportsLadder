@@ -61,10 +61,13 @@ export function leagueLabel(t: LeagueTemplateLike): string {
   // "all ratings, everyone" is the point of it, so spelling out division and
   // level would be noise.
   if (t.name) {
-    // 'open' division means everybody together, which needs no qualifier. Any
-    // other division is a real distinction and has to be visible.
-    const qualifier =
-      t.division === "open" ? format : `${divisionWord(t.division)} ${format}`;
+    // 'open' and 'mixed' both mean everybody together, so neither needs saying
+    // -- and printing it produced "Dallas Pickleball League - Mixed Singles"
+    // next to "... - Mixed Doubles", two leagues differing only in their last
+    // word, which read as the same league listed twice. A gendered division is
+    // a real distinction and stays.
+    const everyone = t.division === "open" || t.division === "mixed";
+    const qualifier = everyone ? format : `${divisionWord(t.division)} ${format}`;
     return `${t.name} \u00b7 ${qualifier}`;
   }
 
