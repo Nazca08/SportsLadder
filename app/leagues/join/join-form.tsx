@@ -4,6 +4,7 @@ import { useState, useTransition } from "react";
 import { divisionOptions, SPORTS, LEVELS, AREAS, type Format, type Division } from "@/lib/leagues/divisions";
 import { joinLeague, searchPlayers, type PlayerSearchResult } from "./actions";
 import { leagueLabel } from "@/lib/leagues/label";
+import { LeagueBadge, FormatChip } from "@/components/league-badge";
 
 export type ClubLeague = {
   id: string;
@@ -117,10 +118,18 @@ export function JoinLeagueForm({
                     : "border-white/10 bg-court-deep text-chalk-dim hover:border-white/30"
                 }`}
               >
-                <span className="block font-semibold">{leagueLabel(c)}</span>
-                <span className="block text-xs text-chalk-dim mt-0.5">
-                  All ratings
-                  {c.division === "open" ? " \u00b7 open to everyone" : ""}
+                <span className="flex items-center gap-3">
+                  <LeagueBadge sport={c.sport} division={c.division} />
+                  <span className="flex-1 min-w-0">
+                    <span className="block font-semibold">{leagueLabel(c)}</span>
+                    <span className="block text-xs text-chalk-dim mt-0.5">
+                      All ratings
+                      {c.division === "open" || c.division === "mixed"
+                        ? " \u00b7 open to everyone"
+                        : ""}
+                    </span>
+                  </span>
+                  <FormatChip format={c.format} />
                 </span>
               </button>
             ))}
