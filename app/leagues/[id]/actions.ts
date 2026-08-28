@@ -118,18 +118,22 @@ export async function reportScore(matchId: string, payload: ScorePayload): Promi
   let winnerSide: "a" | "b";
   let roundsPlayed: { a: number; b: number }[];
 
+  // Taken from the league, not the payload: the client must not get to choose
+  // which rules its own score is validated against.
+  const { data: ls } = await supabase
+    .from("league_seasons")
+    .select("league_templates(scoring_format)")
+    .eq("id", match.league_season_id)
+    .single();
+  const tpl: any = Array.isArray((ls as any)?.league_templates)
+    ? (ls as any).league_templates[0]
+    : (ls as any)?.league_templates;
+  const scoringFormat = (tpl?.scoring_format ?? "standard") as string;
+
   if (payload.sport === "tennis") {
-    // Taken from the league, not the payload: the client must not get to
-    // choose which rules its score is validated against.
-    const { data: ls } = await supabase
-      .from("league_seasons")
-      .select("league_templates(scoring_format)")
-      .eq("id", match.league_season_id)
-      .single();
-    const tpl: any = Array.isArray((ls as any)?.league_templates)
-      ? (ls as any).league_templates[0]
-      : (ls as any)?.league_templates;
-    const format = (tpl?.scoring_format ?? "standard") as "standard" | "single_set";
+    const format = (scoringFormat === "single_set" || scoringFormat === "best_of_3_avg"
+      ? scoringFormat
+      : "standard") as "standard" | "single_set" | "best_of_3_avg";
 
     const result = resolveTennisMatch(payload.sets, format);
     if (!result.valid) return { error: result.error };
@@ -138,7 +142,10 @@ export async function reportScore(matchId: string, payload: ScorePayload): Promi
     winnerSide = result.winnerSide;
     roundsPlayed = result.sets;
   } else {
-    const result = resolvePickleballMatch(payload.games);
+    const result = resolvePickleballMatch(
+      payload.games,
+      scoringFormat === "best_of_3_avg" ? "best_of_3_avg" : "standard"
+    );
     if (!result.valid) return { error: result.error };
     scoreA = result.scoreA;
     scoreB = result.scoreB;
