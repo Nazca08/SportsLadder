@@ -25,8 +25,13 @@ export const LEVELS = ["2.0", "2.5", "3.0", "3.5", "4.0", "4.5", "5.0"] as const
 export const OPEN = "open";
 
 /** The only markets RallyRank.club currently operates in. */
+/**
+ * Dallas is deliberately absent: it runs as four consolidated club leagues
+ * (tennis and pickleball, singles and doubles, all ratings together) which
+ * appear as cards at the top of the join screen. Leaving it here as well would
+ * let somebody create a rating-scoped Dallas league and re-fragment it.
+ */
 export const AREAS: [string, string][] = [
-  ["dallas-tx", "Dallas, Texas"],
   ["utah-valley-ut", "Utah Valley, Utah"],
   ["palmas-del-mar-pr", "Palmas Del Mar, Puerto Rico"],
   ["minneapolis-mn", "Minneapolis, Minnesota"],
