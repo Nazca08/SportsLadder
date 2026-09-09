@@ -15,13 +15,27 @@ export default async function JoinLeaguePage() {
     .eq("id", user.id)
     .single();
 
-  // Named club leagues are created by migration, not by players, so they are
-  // listed rather than built from dropdowns.
-  const { data: clubLeagues } = await supabase
+  // The catalogue. Leagues are a fixed list now, created by migration rather
+  // than conjured from dropdown choices, so the page lists what exists.
+  const { data: leagues } = await supabase
     .from("league_templates")
     .select("id, sport, format, division, level, area, name")
     .not("name", "is", null)
     .order("name");
+
+  // Leagues this player is already in, so they are shown as joined rather than
+  // offered again and rejected by the unique index.
+  const { data: mine } = await supabase
+    .from("enrollments")
+    .select("league_seasons(league_template_id)")
+    .eq("player_id", user.id);
+  const joinedTemplateIds = (mine ?? [])
+    .map((row: any) =>
+      Array.isArray(row.league_seasons)
+        ? row.league_seasons[0]?.league_template_id
+        : row.league_seasons?.league_template_id
+    )
+    .filter(Boolean) as string[];
 
   return (
     <main className="min-h-screen p-8 max-w-lg mx-auto">
@@ -43,9 +57,9 @@ export default async function JoinLeaguePage() {
         </p>
       </div>
       <p className="text-chalk-dim text-sm mb-6">
-        Pick a sport, format, and level. If that exact league doesn&apos;t exist yet, you&apos;ll be the first one in it.
+        Pick your city and sport, then choose from the leagues running there.
       </p>
-      <JoinLeagueForm clubLeagues={clubLeagues ?? []} initialRating={profile?.rating ?? ""} gender={(profile?.gender as "male" | "female") ?? "female"} />
+      <JoinLeagueForm leagues={leagues ?? []} joinedTemplateIds={joinedTemplateIds} />
     </main>
   );
 }
