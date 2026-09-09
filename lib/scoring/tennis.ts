@@ -1,477 +1,119 @@
-import { describe, it, expect } from "vitest";
-import { computePoints } from "./points";
-import { isValidSet, resolveTennisMatch } from "./tennis";
-import { resolvePickleballMatch, isValidGame } from "./pickleball";
-import { rankStandings, seedPositions, nextPowerOfTwo, type StandingsRow } from "./standings";
-import { matchPoints, winMultiplier, lossPenalty, BASE_PENALTY, POINTS_PER_GAME } from "./elo";
-import { resolveAnnualEntrants, type SeasonQualifiers } from "./annual-championship";
+export type SetScore = { a: number; b: number };
 
-describe("computePoints", () => {
-  it("throws on a tie", () => {
-    expect(() => computePoints(6, 6)).toThrow();
-  });
-  it("gives the loser at least 1 and the winner at least 11", () => {
-    const { pointsA, pointsB } = computePoints(6, 0);
-    expect(pointsB).toBeGreaterThanOrEqual(1);
-    expect(pointsA).toBeGreaterThanOrEqual(11);
-    expect(pointsA + pointsB).toBe(20);
-  });
-  it("gives a closer match a closer split", () => {
-    const blowout = computePoints(6, 0);
-    const close = computePoints(7, 6);
-    expect(close.pointsB).toBeGreaterThan(blowout.pointsB);
-  });
-});
+/**
+ * How a tennis league scores a match.
+ *   standard      - conventional sets (6-0..6-4, 7-5, 7-6), any number of them
+ *   single_set    - one set, any score accepted
+ *   best_of_3_avg - up to three sets, any score accepted
+ *   two_sets_to_6 - two sets to 6. At one set all the match goes to whoever won
+ *                   more games, which is how a split is settled in practice and
+ *                   costs nothing here, since the scoring already runs on games.
+ */
+export type TennisFormat = "standard" | "single_set" | "best_of_3_avg" | "two_sets_to_6";
 
-describe("tennis set validation", () => {
-  it("accepts standard set scores", () => {
-    expect(isValidSet(6, 4)).toBe(true);
-    expect(isValidSet(7, 5)).toBe(true);
-    expect(isValidSet(7, 6)).toBe(true);
-  });
-  it("rejects invalid set scores", () => {
-    expect(isValidSet(6, 5)).toBe(false); // must be 7-5, not 6-5
-    expect(isValidSet(5, 4)).toBe(false); // not enough games
-    expect(isValidSet(8, 6)).toBe(false); // not a real set score
-  });
-});
+export type TennisResult =
+  | { valid: true; winnerSide: "a" | "b"; gamesA: number; gamesB: number; sets: SetScore[] }
+  | { valid: false; error: string };
 
-describe("resolveTennisMatch", () => {
-  it("determines the winner by sets, not aggregate games", () => {
-    // A wins the first set big, B wins the next two narrowly -- B should win the match
-    const result = resolveTennisMatch([
-      { a: 6, b: 0 },
-      { a: 4, b: 6 },
-      { a: 4, b: 6 },
-    ]);
-    expect(result.valid).toBe(true);
-    if (result.valid) expect(result.winnerSide).toBe("b");
-  });
-  it("sums games across all sets played for the points input", () => {
-    const result = resolveTennisMatch([
-      { a: 6, b: 4 },
-      { a: 3, b: 6 },
-      { a: 6, b: 2 },
-    ]);
-    expect(result.valid).toBe(true);
-    if (result.valid) {
-      expect(result.gamesA).toBe(15);
-      expect(result.gamesB).toBe(12);
+/**
+ * Standard set: won 6-0..6-4, or 7-5, or 7-6 (tiebreak).
+ *
+ * Single set: anything non-negative. Rain and injuries end real matches at
+ * scores no rulebook describes, and refusing them means the result never gets
+ * recorded -- worse for the standings than an unusual-looking score.
+ */
+export function isValidSet(a: number, b: number, format: TennisFormat = "standard"): boolean {
+  if (a < 0 || b < 0) return false;
+
+  // Permissive formats accept whatever was actually played. Matches get cut
+  // short by rain, injury and daylight, and a validator that rejects 4-2 just
+  // means the result never gets recorded.
+  if (format === "single_set" || format === "best_of_3_avg" || format === "two_sets_to_6") {
+    return true;
+  }
+
+  const max = Math.max(a, b);
+  const min = Math.min(a, b);
+  if (max < 6) return false;
+  if (max === 6) return min <= 4;
+  if (max === 7) return min === 5 || min === 6;
+  return false;
+}
+
+/**
+ * Determines the match winner from however many sets were actually played --
+ * not locked to best-of-3. Whoever won more sets wins the match; an even
+ * split isn't allowed, since there'd be no winner to award points to.
+ * Returns the aggregate games across every set played (not just a "deciding"
+ * set) -- that aggregate feeds computePoints() so the full match is
+ * reflected.
+ */
+export function resolveTennisMatch(
+  sets: SetScore[],
+  format: TennisFormat = "standard"
+): TennisResult {
+  if (sets.length === 0) {
+    return { valid: false, error: "Enter at least one set." };
+  }
+
+  // The set IS the match in this format, so extra rows are a misunderstanding
+  // rather than a longer match.
+  if (format === "best_of_3_avg" && sets.length > 3) {
+    return { valid: false, error: "This league plays best of three \u2014 enter at most three sets." };
+  }
+
+  // Two sets, plus a third line when a deciding tiebreak was played.
+  if (format === "two_sets_to_6" && sets.length > 3) {
+    return {
+      valid: false,
+      error: "This league plays two sets \u2014 enter at most two, plus a deciding tiebreak.",
+    };
+  }
+
+  if (format === "single_set" && sets.length !== 1) {
+    return { valid: false, error: "This league plays one set \u2014 enter a single score." };
+  }
+
+  for (const s of sets) {
+    if (!isValidSet(s.a, s.b, format)) {
+      return { valid: false, error: `Invalid set score: ${s.a}-${s.b}` };
     }
-  });
-  it("accepts a single decisive set (no best-of-3 requirement)", () => {
-    const result = resolveTennisMatch([{ a: 6, b: 4 }]);
-    expect(result.valid).toBe(true);
-    if (result.valid) expect(result.winnerSide).toBe("a");
-  });
-  it("accepts more than 3 sets, as long as played sessions call for it", () => {
-    const result = resolveTennisMatch([
-      { a: 6, b: 4 }, { a: 4, b: 6 }, { a: 6, b: 3 }, { a: 4, b: 6 }, { a: 6, b: 2 },
-    ]);
-    expect(result.valid).toBe(true);
-    if (result.valid) expect(result.winnerSide).toBe("a"); // 3 sets to 2
-  });
-  it("rejects an even split with no winner", () => {
-    const result = resolveTennisMatch([{ a: 6, b: 4 }, { a: 4, b: 6 }]);
-    expect(result.valid).toBe(false);
-  });
-});
+  }
+  const setsWonA = sets.filter((s) => s.a > s.b).length;
+  const setsWonB = sets.filter((s) => s.b > s.a).length;
 
-describe("resolvePickleballMatch", () => {
-  it("requires reaching 11", () => {
-    expect(resolvePickleballMatch([{ a: 10, b: 8 }]).valid).toBe(false);
-  });
-  it("requires winning by 2", () => {
-    expect(resolvePickleballMatch([{ a: 11, b: 10 }]).valid).toBe(false);
-    expect(resolvePickleballMatch([{ a: 12, b: 10 }]).valid).toBe(true);
-  });
-  it("supports a session of several games, winner by majority", () => {
-    const result = resolvePickleballMatch([
-      { a: 11, b: 7 }, { a: 9, b: 11 }, { a: 11, b: 8 }, { a: 6, b: 11 }, { a: 11, b: 9 },
-    ]);
-    expect(result.valid).toBe(true);
-    if (result.valid) expect(result.winnerSide).toBe("a"); // 3 games to 2
-  });
-  it("aggregates points across every game played", () => {
-    const result = resolvePickleballMatch([{ a: 11, b: 7 }, { a: 11, b: 9 }]);
-    expect(result.valid).toBe(true);
-    if (result.valid) {
-      expect(result.scoreA).toBe(22);
-      expect(result.scoreB).toBe(16);
+  // A two-set match splits one set each often enough that it needs a rule
+  // rather than an error. Total games decides it.
+  if (format === "two_sets_to_6" && setsWonA === setsWonB) {
+    const totalA = sets.reduce((sum, s) => sum + s.a, 0);
+    const totalB = sets.reduce((sum, s) => sum + s.b, 0);
+    if (totalA === totalB) {
+      return {
+        valid: false,
+        error: "One set all and level on games \u2014 play a tiebreak and add it as a third line.",
+      };
     }
-  });
-  it("rejects an even split with no winner", () => {
-    const result = resolvePickleballMatch([{ a: 11, b: 7 }, { a: 7, b: 11 }]);
-    expect(result.valid).toBe(false);
-  });
-});
+    return {
+      valid: true,
+      winnerSide: totalA > totalB ? "a" : "b",
+      gamesA: totalA,
+      gamesB: totalB,
+      sets,
+    };
+  }
 
-describe("rankStandings tiebreaker", () => {
-  it("breaks a points tie by fewest losses", () => {
-    const rows: StandingsRow[] = [
-      { entrantId: "a", points: 20, seed: 1000, earned: -980, wins: 1, losses: 1, played: 1, beatenEntrantIds: [] },
-      { entrantId: "b", points: 20, seed: 1000, earned: -980, wins: 2, losses: 0, played: 1, beatenEntrantIds: [] },
-    ];
-    const ranked = rankStandings(rows);
-    expect(ranked[0].entrantId).toBe("b");
-  });
-  it("falls through to best win by opponent standing when losses and wins also tie", () => {
-    const rows: StandingsRow[] = [
-      { entrantId: "a", points: 20, seed: 1000, earned: -980, wins: 2, losses: 0, played: 1, beatenEntrantIds: ["low"] },
-      { entrantId: "b", points: 20, seed: 1000, earned: -980, wins: 2, losses: 0, played: 1, beatenEntrantIds: ["high"] },
-      { entrantId: "low", points: 5, seed: 1000, earned: -995, wins: 0, losses: 2, played: 1, beatenEntrantIds: [] },
-      { entrantId: "high", points: 15, seed: 1000, earned: -985, wins: 1, losses: 1, played: 1, beatenEntrantIds: [] },
-    ];
-    const ranked = rankStandings(rows);
-    // "b" beat the higher-standing opponent, so b should rank above a
-    expect(ranked.findIndex((r) => r.entrantId === "b")).toBeLessThan(
-      ranked.findIndex((r) => r.entrantId === "a")
-    );
-  });
-});
-
-describe("bracket seeding", () => {
-  it("computes the next power of two", () => {
-    expect(nextPowerOfTwo(5)).toBe(8);
-    expect(nextPowerOfTwo(8)).toBe(8);
-    expect(nextPowerOfTwo(9)).toBe(16);
-  });
-  it("produces standard seeding pairs for size 8", () => {
-    expect(seedPositions(8)).toEqual([1, 8, 4, 5, 2, 7, 3, 6]);
-  });
-});
-
-describe("resolveAnnualEntrants substitution", () => {
-  const seasons: SeasonQualifiers[] = [
-    {
-      seasonName: "Winter 2026",
-      standings: [
-        { entrantId: "jordan", entrantName: "Jordan Alvarez" },
-        { entrantId: "sam", entrantName: "Sam Okafor" },
-        { entrantId: "leo", entrantName: "Leo Fischer" },
-      ],
-    },
-    {
-      seasonName: "Spring 2026",
-      standings: [
-        { entrantId: "sam", entrantName: "Sam Okafor" },
-        { entrantId: "leo", entrantName: "Leo Fischer" },
-        { entrantId: "jordan", entrantName: "Jordan Alvarez" },
-      ],
-    },
-    {
-      seasonName: "Summer 2026",
-      // Jordan (already champion of Winter 2026) wins again here --
-      // should cascade to the next available finisher.
-      standings: [
-        { entrantId: "jordan", entrantName: "Jordan Alvarez" },
-        { entrantId: "marcus", entrantName: "Marcus Webb" },
-        { entrantId: "diego", entrantName: "Diego Santos" },
-      ],
-    },
-  ];
-
-  it("gives every slot a distinct entrant", () => {
-    const slots = resolveAnnualEntrants(seasons, new Set());
-    const filled = slots.filter((s) => s.entrantId).map((s) => s.entrantId);
-    expect(new Set(filled).size).toBe(filled.length);
-  });
-
-  it("cascades a repeat winner to the next-best finisher in that season", () => {
-    const slots = resolveAnnualEntrants(seasons, new Set());
-    const summerChampionSlot = slots.find((s) => s.seasonName === "Summer 2026" && s.role === "champion");
-    // Jordan already claimed a slot from Winter 2026, so Summer's champion slot
-    // should fall to Marcus (rank 2), and be marked as a substitution.
-    expect(summerChampionSlot?.entrantId).toBe("marcus");
-    expect(summerChampionSlot?.substituted).toBe(true);
-  });
-
-  it("skips a marked-unavailable entrant", () => {
-    const slots = resolveAnnualEntrants(seasons, new Set(["sam"]));
-    const winterRunnerUpSlot = slots.find((s) => s.seasonName === "Winter 2026" && s.role === "runner_up");
-    // Sam was the natural runner-up of Winter 2026 but is marked unavailable,
-    // so it should fall to Leo (rank 3).
-    expect(winterRunnerUpSlot?.entrantId).toBe("leo");
-    expect(winterRunnerUpSlot?.substituted).toBe(true);
-  });
-});
-
-// ---------------------------------------------------------------------------
-// Single set, permissive (Palmas Tennis League)
-// ---------------------------------------------------------------------------
-describe("single set format", () => {
-  it("accepts the intended pro-set scores", () => {
-    expect(isValidSet(8, 6, "single_set")).toBe(true);
-    expect(isValidSet(9, 7, "single_set")).toBe(true);
-    expect(isValidSet(9, 8, "single_set")).toBe(true);
-  });
-
-  it("accepts a match cut short by rain or injury", () => {
-    expect(isValidSet(4, 2, "single_set")).toBe(true);
-    expect(isValidSet(1, 0, "single_set")).toBe(true);
-  });
-
-  it("accepts a long set that was played out past 8", () => {
-    expect(isValidSet(13, 11, "single_set")).toBe(true);
-  });
-
-  it("still rejects negative games, which are typos rather than results", () => {
-    expect(isValidSet(-1, 4, "single_set")).toBe(false);
-  });
-
-  it("leaves standard leagues strict", () => {
-    expect(isValidSet(8, 6, "standard")).toBe(false);
-    expect(isValidSet(4, 2, "standard")).toBe(false);
-  });
-
-  it("resolves an unfinished set, using games as the aggregate", () => {
-    const result = resolveTennisMatch([{ a: 4, b: 2 }], "single_set");
-    expect(result.valid).toBe(true);
-    if (result.valid) {
-      expect(result.winnerSide).toBe("a");
-      expect(result.gamesA).toBe(4);
-      expect(result.gamesB).toBe(2);
-    }
-  });
-
-  it("refuses more than one set", () => {
-    const result = resolveTennisMatch([{ a: 8, b: 5 }, { a: 8, b: 4 }], "single_set");
-    expect(result.valid).toBe(false);
-  });
-
-  it("refuses a draw, since 20 points cannot be split without a winner", () => {
-    const result = resolveTennisMatch([{ a: 5, b: 5 }], "single_set");
-    expect(result.valid).toBe(false);
-  });
-
-  it("awards points on the games played, however few", () => {
-    // 8-5 is 13 games; the loser's share rounds to 20 * 5/13 = 8.
-    expect(computePoints(8, 5)).toEqual({ pointsA: 12, pointsB: 8 });
-    // A short 4-2 splits on the same ratio as 8-4 would.
-    expect(computePoints(4, 2)).toEqual({ pointsA: 13, pointsB: 7 });
-  });
-});
-
-// ---------------------------------------------------------------------------
-// League points: winner = games * 2, loser = games * 2 - 5
-
-// ---------------------------------------------------------------------------
-// League points: G x 2, scaled by the rating gap
-// ---------------------------------------------------------------------------
-describe("winMultiplier", () => {
-  it("is 1 between equals", () => {
-    expect(winMultiplier(0)).toBeCloseTo(1, 5);
-  });
-  it("rises for beating someone above you and falls for someone below", () => {
-    expect(winMultiplier(2.5)).toBeCloseTo(1.375, 3);
-    expect(winMultiplier(-2.5)).toBeCloseTo(0.625, 3);
-  });
-  it("clamps at both ends so extreme gaps cannot run away", () => {
-    expect(winMultiplier(10)).toBe(1.45);
-    expect(winMultiplier(-10)).toBe(0.55);
-  });
-});
-
-describe("lossPenalty", () => {
-  it("costs the base amount between equals", () => {
-    expect(lossPenalty(0)).toBe(BASE_PENALTY);
-  });
-  it("costs nothing when you were badly outmatched", () => {
-    expect(lossPenalty(2.5)).toBe(0);
-    expect(lossPenalty(3)).toBe(0);
-  });
-  it("costs heavily when you lost to someone below you", () => {
-    expect(lossPenalty(-2)).toBe(22);
-  });
-});
-
-describe("matchPoints", () => {
-  it("pays two per game between equals", () => {
-    expect(matchPoints(8, 6, 3.5, 3.5)).toEqual({ winner: 16, loser: 0 });
-    expect(matchPoints(9, 8, 3.5, 3.5)).toEqual({ winner: 18, loser: 4 });
-  });
-
-  it("punishes losing badly to a peer", () => {
-    expect(matchPoints(8, 0, 3.5, 3.5).loser).toBe(-12);
-  });
-
-  it("pays a big bonus for beating someone well above you", () => {
-    expect(matchPoints(8, 6, 2.0, 4.5).winner).toBe(22);
-  });
-
-  it("pays little for beating someone well below you", () => {
-    expect(matchPoints(8, 1, 4.5, 2.0).winner).toBe(10);
-  });
-
-  it("never takes points off an underdog, however heavy the defeat", () => {
-    // The whole point of the penalty floor: Jana cannot go backwards for
-    // losing to someone two and a half levels above her.
-    expect(matchPoints(8, 0, 4.5, 2.0).loser).toBe(0);
-    expect(matchPoints(8, 1, 4.5, 2.0).loser).toBeGreaterThan(0);
-  });
-
-  it("punishes a favourite who loses to someone far below them", () => {
-    expect(matchPoints(8, 6, 2.0, 4.5).loser).toBeLessThan(0);
-  });
-
-  it("never lets the loser out-earn the winner", () => {
-    for (const [wg, lg, wr, lr] of [
-      [8, 6, 4.5, 2.0], [9, 8, 4.5, 2.0], [8, 6, 5.0, 2.0], [8, 5, 4.0, 2.5],
-    ] as const) {
-      const { winner, loser } = matchPoints(wg, lg, wr, lr);
-      expect(loser).toBeLessThan(winner);
-    }
-  });
-
-  it("keeps its constants in step with the documented rule", () => {
-    expect(POINTS_PER_GAME).toBe(2);
-    expect(BASE_PENALTY).toBe(12);
-  });
-});
-
-// ---------------------------------------------------------------------------
-// Dallas: best of three, averaged
-// ---------------------------------------------------------------------------
-describe("best_of_3_avg format", () => {
-  it("accepts a normal pickleball game", () => {
-    expect(isValidGame(11, 5, "best_of_3_avg")).toBe(true);
-  });
-
-  it("accepts a game cut short, which standard rules reject", () => {
-    expect(isValidGame(6, 3, "best_of_3_avg")).toBe(true);
-    expect(isValidGame(6, 3, "standard")).toBe(false);
-  });
-
-  it("still refuses negative scores, which are typos not results", () => {
-    expect(isValidGame(-1, 5, "best_of_3_avg")).toBe(false);
-  });
-
-  it("resolves a two-game win", () => {
-    const r = resolvePickleballMatch([{ a: 11, b: 5 }, { a: 11, b: 7 }], "best_of_3_avg");
-    expect(r.valid).toBe(true);
-    if (r.valid) expect(r.winnerSide).toBe("a");
-  });
-
-  it("resolves a three-game win", () => {
-    const r = resolvePickleballMatch(
-      [{ a: 11, b: 5 }, { a: 9, b: 11 }, { a: 11, b: 8 }],
-      "best_of_3_avg"
-    );
-    expect(r.valid).toBe(true);
-    if (r.valid) expect(r.winnerSide).toBe("a");
-  });
-
-  it("refuses a fourth game", () => {
-    const r = resolvePickleballMatch(
-      [{ a: 11, b: 5 }, { a: 11, b: 7 }, { a: 11, b: 9 }, { a: 11, b: 3 }],
-      "best_of_3_avg"
-    );
-    expect(r.valid).toBe(false);
-  });
-
-  it("refuses a drawn match, which cannot be scored", () => {
-    const r = resolvePickleballMatch([{ a: 11, b: 5 }, { a: 5, b: 11 }], "best_of_3_avg");
-    expect(r.valid).toBe(false);
-  });
-
-  it("tennis accepts up to three sets and rejects a fourth", () => {
-    expect(resolveTennisMatch([{ a: 6, b: 4 }, { a: 4, b: 6 }, { a: 6, b: 3 }], "best_of_3_avg").valid).toBe(true);
-    expect(resolveTennisMatch(
-      [{ a: 6, b: 4 }, { a: 4, b: 6 }, { a: 6, b: 3 }, { a: 6, b: 0 }], "best_of_3_avg"
-    ).valid).toBe(false);
-  });
-});
-
-describe("averaging makes two- and three-game matches comparable", () => {
-  // The averaging itself lives in computeLeagueStandings; this pins the maths
-  // it performs so a change there cannot silently alter the scoring.
-  const avg = (sets: { a: number; b: number }[], side: "a" | "b") =>
-    sets.reduce((s, g) => s + g[side], 0) / sets.length;
-
-  it("a straight-games win and a three-game win score alike", () => {
-    const twoGame = [{ a: 11, b: 5 }, { a: 11, b: 7 }];
-    const threeGame = [{ a: 11, b: 5 }, { a: 9, b: 11 }, { a: 11, b: 8 }];
-
-    // Summing would pay the three-gamer 31 against 22 for going the distance.
-    expect(twoGame.reduce((s, g) => s + g.a, 0)).toBe(22);
-    expect(threeGame.reduce((s, g) => s + g.a, 0)).toBe(31);
-
-    // Averaged, they sit within a point of each other.
-    expect(avg(twoGame, "a")).toBe(11);
-    expect(avg(threeGame, "a")).toBeCloseTo(10.33, 1);
-  });
-
-  it("feeds matchPoints a per-game figure, not a total", () => {
-    const sets = [{ a: 11, b: 5 }, { a: 9, b: 11 }, { a: 11, b: 8 }];
-    const pts = matchPoints(avg(sets, "a"), avg(sets, "b"), 3.5, 3.5);
-    // 10.33 * 2 = 20.7 -> 21 for the winner; 8 * 2 - 12 = 4 for the loser.
-    expect(pts.winner).toBe(21);
-    expect(pts.loser).toBe(4);
-  });
-});
-
-// ---------------------------------------------------------------------------
-// Tennis: two sets to 6
-// ---------------------------------------------------------------------------
-describe("two_sets_to_6", () => {
-  it("resolves a straight-sets win", () => {
-    const r = resolveTennisMatch([{ a: 6, b: 4 }, { a: 6, b: 3 }], "two_sets_to_6");
-    expect(r.valid).toBe(true);
-    if (r.valid) {
-      expect(r.winnerSide).toBe("a");
-      expect(r.gamesA).toBe(12);
-      expect(r.gamesB).toBe(7);
-    }
-  });
-
-  it("gives one set all to whoever won more games", () => {
-    // 6-1, 4-6: a set each, but 10 games to 7.
-    const r = resolveTennisMatch([{ a: 6, b: 1 }, { a: 4, b: 6 }], "two_sets_to_6");
-    expect(r.valid).toBe(true);
-    if (r.valid) expect(r.winnerSide).toBe("a");
-  });
-
-  it("gives it the other way when the games favour the other side", () => {
-    const r = resolveTennisMatch([{ a: 6, b: 4 }, { a: 1, b: 6 }], "two_sets_to_6");
-    expect(r.valid).toBe(true);
-    if (r.valid) expect(r.winnerSide).toBe("b");
-  });
-
-  it("refuses one set all with the games level too", () => {
-    // 6-3, 3-6: a set each and nine games each. Nothing left to decide it.
-    const r = resolveTennisMatch([{ a: 6, b: 3 }, { a: 3, b: 6 }], "two_sets_to_6");
-    expect(r.valid).toBe(false);
-  });
-
-  it("accepts a third line for a deciding tiebreak", () => {
-    const r = resolveTennisMatch(
-      [{ a: 6, b: 3 }, { a: 3, b: 6 }, { a: 10, b: 7 }],
-      "two_sets_to_6"
-    );
-    expect(r.valid).toBe(true);
-    if (r.valid) expect(r.winnerSide).toBe("a");
-  });
-
-  it("refuses a fourth line", () => {
-    const r = resolveTennisMatch(
-      [{ a: 6, b: 3 }, { a: 3, b: 6 }, { a: 6, b: 4 }, { a: 6, b: 2 }],
-      "two_sets_to_6"
-    );
-    expect(r.valid).toBe(false);
-  });
-
-  it("accepts a set cut short by rain", () => {
-    const r = resolveTennisMatch([{ a: 4, b: 2 }], "two_sets_to_6");
-    expect(r.valid).toBe(true);
-  });
-
-  it("leaves existing single-set results scoring identically", () => {
-    // Palmas has sixteen one-set matches recorded. Averaging across one set is
-    // the same number as summing it, so switching format cannot rescore them.
-    const sets = [{ a: 8, b: 6 }];
-    const sum = sets.reduce((s, g) => s + g.a, 0);
-    const avg = sum / sets.length;
-    expect(avg).toBe(sum);
-    expect(matchPoints(avg, 6, 3.5, 3.5)).toEqual(matchPoints(sum, 6, 3.5, 3.5));
-  });
-});
+  if (setsWonA === setsWonB) {
+    // The only rule left in single_set. Points are a split of 20 between a
+    // winner and a loser, so a drawn score has nobody to award them to.
+    return {
+      valid: false,
+      error:
+        format === "single_set"
+          ? "A match needs a winner \u2014 an even score can\u2019t be scored."
+          : "Sets played must produce a winner \u2014 add another set to break the tie.",
+    };
+  }
+  const gamesA = sets.reduce((sum, s) => sum + s.a, 0);
+  const gamesB = sets.reduce((sum, s) => sum + s.b, 0);
+  return { valid: true, winnerSide: setsWonA > setsWonB ? "a" : "b", gamesA, gamesB, sets };
+}
