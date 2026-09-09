@@ -26,14 +26,13 @@ export const OPEN = "open";
 
 /** The only markets RallyRank.club currently operates in. */
 /**
- * Dallas is deliberately absent: it runs as four consolidated club leagues
- * (tennis and pickleball, singles and doubles, all ratings together) which
- * appear as cards at the top of the join screen. Leaving it here as well would
- * let somebody create a rating-scoped Dallas league and re-fragment it.
+ * Cities with leagues. Used to order and label the city picker; a city only
+ * appears once the catalogue actually holds a league there.
  */
 export const AREAS: [string, string][] = [
-  ["utah-valley-ut", "Utah Valley, Utah"],
   ["palmas-del-mar-pr", "Palmas Del Mar, Puerto Rico"],
+  ["dallas-tx", "Dallas, Texas"],
+  ["belmont-nc", "Belmont, North Carolina"],
+  ["provo-ut", "Provo, Utah"],
   ["minneapolis-mn", "Minneapolis, Minnesota"],
-  ["raleigh-nc", "Raleigh, North Carolina"],
 ];
