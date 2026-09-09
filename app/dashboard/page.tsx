@@ -2,10 +2,9 @@ import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { SignOutButton } from "@/components/sign-out-button";
 import { AREAS } from "@/lib/leagues/divisions";
-import { leagueLabel } from "@/lib/leagues/label";
+import { leagueLabel, areaName } from "@/lib/leagues/label";
 import { LeagueBadge, FormatChip } from "@/components/league-badge";
 
-const areaName = (code?: string) => AREAS.find(([c]) => c === code)?.[1] ?? code;
 
 
 export default async function DashboardPage() {
@@ -59,27 +58,69 @@ export default async function DashboardPage() {
         <p className="text-chalk-dim text-sm">You&apos;re not enrolled in any leagues yet.</p>
       )}
 
-      <div className="space-y-2">
-        {enrollments.map((e: any) => {
+      {/* Grouped by city, in the order the city picker uses. Someone playing in
+          two markets was previously handed one flat list in whatever order the
+          database returned, which is no order at all. */}
+      {(() => {
+        const rows = enrollments.map((e: any) => {
           const template = Array.isArray(e.league_seasons?.league_templates)
             ? e.league_seasons.league_templates[0]
             : e.league_seasons?.league_templates;
-          return (
-            <a
-              key={e.id}
-              href={`/leagues/${e.id}`}
-              className="flex items-center gap-3 bg-panel border border-white/10 rounded-xl px-4 py-3 hover:border-ball transition"
-            >
-              <LeagueBadge
-                sport={(template as any)?.sport ?? "tennis"}
-                division={(template as any)?.division ?? "mixed"}
-              />
-              <span className="flex-1 min-w-0">{template ? leagueLabel(template) : "League"}</span>
-              <FormatChip format={(template as any)?.format ?? "singles"} />
-            </a>
-          );
-        })}
-      </div>
+          return { id: e.id as string, template };
+        });
+
+        // AREAS first so cities appear in a stable, deliberate order; anything
+        // with an unrecognised area falls to the end rather than vanishing.
+        const order = AREAS.map(([code]) => code);
+        const cities = Array.from(
+          new Set(rows.map((r) => r.template?.area ?? ""))
+        ).sort((a, b) => {
+          const ia = order.indexOf(a);
+          const ib = order.indexOf(b);
+          return (ia === -1 ? 99 : ia) - (ib === -1 ? 99 : ib);
+        });
+
+        return (
+          <div className="space-y-6">
+            {cities.map((city) => (
+              <div key={city}>
+                <h2 className="font-display text-sm tracking-[0.15em] text-chalk-dim uppercase mb-2">
+                  {areaName(city) || "Other"}
+                </h2>
+                <div className="space-y-2">
+                  {rows
+                    .filter((r) => (r.template?.area ?? "") === city)
+                    // Tennis before pickleball, singles before doubles, so the
+                    // same league always sits in the same place week to week.
+                    .sort((a, b) =>
+                      (a.template?.sport ?? "").localeCompare(b.template?.sport ?? "") ||
+                      (a.template?.format ?? "").localeCompare(b.template?.format ?? "") ||
+                      (a.template?.division ?? "").localeCompare(b.template?.division ?? "")
+                    )
+                    .map(({ id, template }) => (
+                      <a
+                        key={id}
+                        href={`/leagues/${id}`}
+                        className="flex items-center gap-3 bg-panel border border-white/10 rounded-xl px-4 py-3 hover:border-ball transition"
+                      >
+                        <LeagueBadge
+                          sport={template?.sport ?? "tennis"}
+                          division={template?.division ?? "mixed"}
+                          format={template?.format ?? "singles"}
+                          area={template?.area}
+                        />
+                        <span className="flex-1 min-w-0">
+                          {template ? leagueLabel(template) : "League"}
+                        </span>
+                        <FormatChip format={template?.format ?? "singles"} />
+                      </a>
+                    ))}
+                </div>
+              </div>
+            ))}
+          </div>
+        );
+      })()}
     </main>
   );
 }
