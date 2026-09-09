@@ -131,9 +131,13 @@ export async function reportScore(matchId: string, payload: ScorePayload): Promi
   const scoringFormat = (tpl?.scoring_format ?? "standard") as string;
 
   if (payload.sport === "tennis") {
-    const format = (scoringFormat === "single_set" || scoringFormat === "best_of_3_avg"
-      ? scoringFormat
-      : "standard") as "standard" | "single_set" | "best_of_3_avg";
+    const format = (
+      scoringFormat === "single_set" ||
+      scoringFormat === "best_of_3_avg" ||
+      scoringFormat === "two_sets_to_6"
+        ? scoringFormat
+        : "standard"
+    ) as "standard" | "single_set" | "best_of_3_avg" | "two_sets_to_6";
 
     const result = resolveTennisMatch(payload.sets, format);
     if (!result.valid) return { error: result.error };
