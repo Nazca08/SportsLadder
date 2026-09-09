@@ -409,3 +409,69 @@ describe("averaging makes two- and three-game matches comparable", () => {
     expect(pts.loser).toBe(4);
   });
 });
+
+// ---------------------------------------------------------------------------
+// Tennis: two sets to 6
+// ---------------------------------------------------------------------------
+describe("two_sets_to_6", () => {
+  it("resolves a straight-sets win", () => {
+    const r = resolveTennisMatch([{ a: 6, b: 4 }, { a: 6, b: 3 }], "two_sets_to_6");
+    expect(r.valid).toBe(true);
+    if (r.valid) {
+      expect(r.winnerSide).toBe("a");
+      expect(r.gamesA).toBe(12);
+      expect(r.gamesB).toBe(7);
+    }
+  });
+
+  it("gives one set all to whoever won more games", () => {
+    // 6-1, 4-6: a set each, but 10 games to 7.
+    const r = resolveTennisMatch([{ a: 6, b: 1 }, { a: 4, b: 6 }], "two_sets_to_6");
+    expect(r.valid).toBe(true);
+    if (r.valid) expect(r.winnerSide).toBe("a");
+  });
+
+  it("gives it the other way when the games favour the other side", () => {
+    const r = resolveTennisMatch([{ a: 6, b: 4 }, { a: 1, b: 6 }], "two_sets_to_6");
+    expect(r.valid).toBe(true);
+    if (r.valid) expect(r.winnerSide).toBe("b");
+  });
+
+  it("refuses one set all with the games level too", () => {
+    // 6-3, 3-6: a set each and nine games each. Nothing left to decide it.
+    const r = resolveTennisMatch([{ a: 6, b: 3 }, { a: 3, b: 6 }], "two_sets_to_6");
+    expect(r.valid).toBe(false);
+  });
+
+  it("accepts a third line for a deciding tiebreak", () => {
+    const r = resolveTennisMatch(
+      [{ a: 6, b: 3 }, { a: 3, b: 6 }, { a: 10, b: 7 }],
+      "two_sets_to_6"
+    );
+    expect(r.valid).toBe(true);
+    if (r.valid) expect(r.winnerSide).toBe("a");
+  });
+
+  it("refuses a fourth line", () => {
+    const r = resolveTennisMatch(
+      [{ a: 6, b: 3 }, { a: 3, b: 6 }, { a: 6, b: 4 }, { a: 6, b: 2 }],
+      "two_sets_to_6"
+    );
+    expect(r.valid).toBe(false);
+  });
+
+  it("accepts a set cut short by rain", () => {
+    const r = resolveTennisMatch([{ a: 4, b: 2 }], "two_sets_to_6");
+    expect(r.valid).toBe(true);
+  });
+
+  it("leaves existing single-set results scoring identically", () => {
+    // Palmas has sixteen one-set matches recorded. Averaging across one set is
+    // the same number as summing it, so switching format cannot rescore them.
+    const sets = [{ a: 8, b: 6 }];
+    const sum = sets.reduce((s, g) => s + g.a, 0);
+    const avg = sum / sets.length;
+    expect(avg).toBe(sum);
+    expect(matchPoints(avg, 6, 3.5, 3.5)).toEqual(matchPoints(sum, 6, 3.5, 3.5));
+  });
+});
