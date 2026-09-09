@@ -143,7 +143,7 @@ type Props = {
   defaultLocation: string;
   entrantRatings: Record<string, string | null>;
   showRatings: boolean;
-  scoringFormat: "standard" | "single_set" | "best_of_3_avg";
+  scoringFormat: "standard" | "single_set" | "best_of_3_avg" | "two_sets_to_6";
   deltaByMatch: Record<string, { a: number; b: number }>;
   sport: "tennis" | "pickleball";
   myEntrantId: string | null;
@@ -204,14 +204,16 @@ function ScoreForm({
 }: {
   sport: "tennis" | "pickleball";
   onSubmit: (payload: any) => void;
-  scoringFormat?: "standard" | "single_set" | "best_of_3_avg";
+  scoringFormat?: "standard" | "single_set" | "best_of_3_avg" | "two_sets_to_6";
 }) {
   // A pro set is the whole match, so the form opens with one row and does not
   // offer to add more.
   const singleSet = sport === "tennis" && scoringFormat === "single_set";
   // Best of three: two rows to start, a third available, no more.
   const bestOfThree = scoringFormat === "best_of_3_avg";
-  const maxRounds = bestOfThree ? 3 : 99;
+  const twoSets = scoringFormat === "two_sets_to_6";
+  // Two-set leagues allow a third line only for a deciding tiebreak.
+  const maxRounds = bestOfThree ? 3 : twoSets ? 3 : 99;
   const [rounds, setRounds] = useState(
     singleSet ? [{ a: "", b: "" }] : [{ a: "", b: "" }, { a: "", b: "" }]
   );
@@ -250,6 +252,12 @@ function ScoreForm({
           </div>
         ))}
       </div>
+      {twoSets && (
+        <p className="text-chalk-dim text-xs mb-2">
+          Two sets to 6. One set all is decided on total games &mdash; only add a third
+          line if you played a deciding tiebreak.
+        </p>
+      )}
       {bestOfThree && (
         <p className="text-chalk-dim text-xs mb-2">
           Best of three. {sport === "pickleball" ? "Games to 11, win by 2." : ""} Enter
@@ -477,7 +485,7 @@ function ChallengesTab({ leagueSeasonId, matches, standings, name, avatar, rank,
   );
 }
 
-function MatchesTab({ sport, matches, resultsByMatch, name, myEntrantId, scoringFormat, deltaByMatch }: { sport: "tennis" | "pickleball"; matches: Match[]; resultsByMatch: Record<string, MatchResult>; name: (id: string) => string; myEntrantId: string | null; scoringFormat: "standard" | "single_set" | "best_of_3_avg"; deltaByMatch: Record<string, { a: number; b: number }> }) {
+function MatchesTab({ sport, matches, resultsByMatch, name, myEntrantId, scoringFormat, deltaByMatch }: { sport: "tennis" | "pickleball"; matches: Match[]; resultsByMatch: Record<string, MatchResult>; name: (id: string) => string; myEntrantId: string | null; scoringFormat: "standard" | "single_set" | "best_of_3_avg" | "two_sets_to_6"; deltaByMatch: Record<string, { a: number; b: number }> }) {
   const { run, error } = useAction();
 
   const scheduled = matches.filter((m) => m.status === "scheduled" && (m.entrant_a_id === myEntrantId || m.entrant_b_id === myEntrantId));
