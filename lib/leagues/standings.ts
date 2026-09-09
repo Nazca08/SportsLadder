@@ -59,7 +59,8 @@ export async function computeLeagueStandings(
   // best_of_3_avg leagues average across the sets played instead of summing
   // them. A three-gamer is not worth half as much again as a two-gamer just
   // for having gone the distance -- what counts is how you played per game.
-  const averageSets = (tpl?.scoring_format ?? "standard") === "best_of_3_avg";
+  const fmt = tpl?.scoring_format ?? "standard";
+  const averageSets = fmt === "best_of_3_avg" || fmt === "two_sets_to_6";
 
   const playerIds = (enrollments ?? []).map((e) => e.player_id).filter(Boolean) as string[];
   const { data: profiles } = isOpenLeague && playerIds.length
