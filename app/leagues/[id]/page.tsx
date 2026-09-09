@@ -99,7 +99,9 @@ export default async function LeaguePage({
           <LeagueBadge
             sport={(template as any)?.sport ?? "tennis"}
             division={(template as any)?.division ?? "mixed"}
-            size={30}
+            format={(template as any)?.format ?? "singles"}
+            area={(template as any)?.area}
+            size={34}
           />
           {template ? leagueLabel(template as any) : "League"}
           <FormatChip format={(template as any)?.format ?? "singles"} />
