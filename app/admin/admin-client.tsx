@@ -15,7 +15,7 @@ type AdminMatch = {
   entrantBName: string | null;
   leagueLabel: string;
   sport: "tennis" | "pickleball";
-  scoringFormat?: "standard" | "single_set" | "best_of_3_avg";
+  scoringFormat?: "standard" | "single_set" | "best_of_3_avg" | "two_sets_to_6";
 };
 
 type RosterEntry = {
@@ -68,7 +68,7 @@ type HistoryRow = {
 
 const RATINGS = ["2.0", "2.5", "3.0", "3.5", "4.0", "4.5", "5.0"];
 
-function ScoreForm({ sport, onSubmit, scoringFormat = "standard" }: { sport: "tennis" | "pickleball"; onSubmit: (payload: any) => void; scoringFormat?: "standard" | "single_set" | "best_of_3_avg" }) {
+function ScoreForm({ sport, onSubmit, scoringFormat = "standard" }: { sport: "tennis" | "pickleball"; onSubmit: (payload: any) => void; scoringFormat?: "standard" | "single_set" | "best_of_3_avg" | "two_sets_to_6" }) {
   // A single-set league is one row. Offering "Set 2" invites an entry the
   // validator will reject.
   const singleSet = sport === "tennis" && scoringFormat === "single_set";
