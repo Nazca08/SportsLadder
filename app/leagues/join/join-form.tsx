@@ -170,7 +170,7 @@ export function JoinLeagueForm({
                   }`}
                 >
                   <span className="flex items-center gap-3">
-                    <LeagueBadge sport={l.sport} division={l.division} />
+                    <LeagueBadge sport={l.sport} division={l.division} format={l.format} area={l.area} />
                     <span className="flex-1 min-w-0">
                       <span className="block text-sm font-semibold">{leagueLabel(l)}</span>
                       <span className="block text-xs text-chalk-dim mt-0.5">
