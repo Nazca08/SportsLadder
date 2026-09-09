@@ -1,85 +1,122 @@
+import { STATE_PATHS, AREA_STATE } from "@/lib/leagues/state-paths";
+
 /**
  * Visual identifier for a league.
  *
- * Text alone was not doing the job: "Dallas Pickleball League - Mixed Singles"
- * and "Dallas Pickleball League - Mixed Doubles" differ by one word at the end
- * of a long line, and read as the same league at a glance. Sport is carried by
- * the icon, division by its colour, and singles versus doubles by an explicit
- * 1v1 / 2v2 chip -- three signals that can be told apart without reading.
+ * Three signals, each readable without reading the label:
+ *   - the state outline behind everything says where
+ *   - one paddle or ball for singles, two for doubles
+ *   - colour says division: pink for women's, ball-yellow for everyone else
+ *
+ * Text alone was not enough. "Dallas Pickleball League - Singles" and
+ * "... - Doubles" differ by one word at the end of a long line and read as the
+ * same league at a glance.
  */
 
-/**
- * Division colours, drawn from the brand palette rather than the usual
- * blue-for-men pink-for-women shorthand. Men's and women's are deliberately
- * different hues rather than a warm/cool pair, so neither reads as the default.
- */
-const DIVISION_COLOR: Record<string, { fg: string; bg: string; ring: string }> = {
-  mens: { fg: "#5FB0DE", bg: "rgba(95,176,222,0.12)", ring: "rgba(95,176,222,0.40)" },
-  womens: { fg: "#B98CD6", bg: "rgba(185,140,214,0.12)", ring: "rgba(185,140,214,0.40)" },
-  mixed: { fg: "#D7E639", bg: "rgba(215,230,57,0.12)", ring: "rgba(215,230,57,0.40)" },
-  open: { fg: "#EA5A3D", bg: "rgba(234,90,61,0.12)", ring: "rgba(234,90,61,0.40)" },
-};
+const WOMENS = "#F26BA6";
+const DEFAULT = "#D7E639";
 
-function colorsFor(division: string) {
-  return DIVISION_COLOR[division] ?? DIVISION_COLOR.mixed;
+function colorFor(division: string) {
+  return division === "womens" ? WOMENS : DEFAULT;
 }
 
-/** Tennis ball: circle with the seam. */
-function TennisIcon({ color, size }: { color: string; size: number }) {
+/** Pickleball paddle, drawn in a 24x24 box with the handle at the bottom. */
+function Paddle({ color }: { color: string }) {
   return (
-    <svg width={size} height={size} viewBox="0 0 24 24" fill="none" aria-hidden="true">
-      <circle cx="12" cy="12" r="9" stroke={color} strokeWidth="1.8" />
-      <path d="M4.5 6.5c3.5 2 4.8 7.2 2.6 11.6" stroke={color} strokeWidth="1.6" strokeLinecap="round" />
-      <path d="M19.5 6.5c-3.5 2-4.8 7.2-2.6 11.6" stroke={color} strokeWidth="1.6" strokeLinecap="round" />
-    </svg>
+    <g>
+      <rect x="5" y="1.5" width="14" height="15.5" rx="6.5" fill={color} />
+      <rect x="10.2" y="16" width="3.6" height="6.5" rx="1.6" fill={color} />
+      <circle cx="9.4" cy="6.6" r="1.05" fill="#14302A" />
+      <circle cx="14.6" cy="6.6" r="1.05" fill="#14302A" />
+      <circle cx="9.4" cy="11.4" r="1.05" fill="#14302A" />
+      <circle cx="14.6" cy="11.4" r="1.05" fill="#14302A" />
+    </g>
   );
 }
 
-/** Pickleball paddle: a solid face and a handle. Reads differently from a ball at small sizes. */
-function PickleballIcon({ color, size }: { color: string; size: number }) {
+/** Tennis ball with its seam, in the same 24x24 box. */
+function Ball({ color }: { color: string }) {
   return (
-    <svg width={size} height={size} viewBox="0 0 24 24" fill="none" aria-hidden="true">
-      <rect x="4.5" y="2.5" width="13" height="14" rx="4" stroke={color} strokeWidth="1.8" />
-      <circle cx="9" cy="7" r="1" fill={color} />
-      <circle cx="13" cy="7" r="1" fill={color} />
-      <circle cx="9" cy="11" r="1" fill={color} />
-      <circle cx="13" cy="11" r="1" fill={color} />
-      <path d="M11 16.5V21" stroke={color} strokeWidth="1.8" strokeLinecap="round" />
-    </svg>
+    <g>
+      <circle cx="12" cy="12" r="9.5" fill={color} />
+      <path
+        d="M4.2 6.9c3.9 2.2 5.3 8 2.9 12.8"
+        stroke="#14302A"
+        strokeWidth="1.7"
+        fill="none"
+        strokeLinecap="round"
+      />
+      <path
+        d="M19.8 6.9c-3.9 2.2-5.3 8-2.9 12.8"
+        stroke="#14302A"
+        strokeWidth="1.7"
+        fill="none"
+        strokeLinecap="round"
+      />
+    </g>
   );
 }
 
 export function LeagueBadge({
   sport,
   division,
-  size = 34,
+  format,
+  area,
+  size = 42,
 }: {
   sport: string;
   division: string;
+  format: string;
+  area?: string | null;
   size?: number;
 }) {
-  const c = colorsFor(division);
-  const iconSize = Math.round(size * 0.6);
+  const color = colorFor(division);
+  const doubles = format === "doubles";
+  const statePath = area ? STATE_PATHS[AREA_STATE[area] ?? ""] : undefined;
+  const Icon = sport === "tennis" ? Ball : Paddle;
+
+  const divisionWord =
+    division === "womens" ? "women's" : division === "mens" ? "men's" : "mixed";
 
   return (
     <span
-      className="inline-flex shrink-0 items-center justify-center rounded-lg"
-      style={{ width: size, height: size, background: c.bg, boxShadow: `inset 0 0 0 1px ${c.ring}` }}
-      // The label spells out what the colour and icon encode, for anyone using
-      // a screen reader or who cannot tell the hues apart.
+      className="inline-flex shrink-0 items-center justify-center rounded-lg overflow-hidden"
+      style={{
+        width: size,
+        height: size,
+        background: "rgba(255,255,255,0.04)",
+        boxShadow: `inset 0 0 0 1px ${color}44`,
+      }}
       role="img"
-      aria-label={`${sport === "tennis" ? "Tennis" : "Pickleball"}, ${division} division`}
+      aria-label={`${sport === "tennis" ? "Tennis" : "Pickleball"}, ${
+        doubles ? "doubles" : "singles"
+      }, ${divisionWord}`}
     >
-      {sport === "tennis" ? (
-        <TennisIcon color={c.fg} size={iconSize} />
-      ) : (
-        <PickleballIcon color={c.fg} size={iconSize} />
-      )}
+      <svg width={size} height={size} viewBox="0 0 100 100" aria-hidden="true">
+        {/* The state sits behind at low opacity: recognisable as a shape without
+            competing with the icons for attention. */}
+        {statePath && <path d={statePath} fill={color} fillOpacity={0.2} />}
+
+        {doubles ? (
+          <>
+            <g transform="translate(14,30) scale(1.5)">
+              <Icon color={color} />
+            </g>
+            <g transform="translate(50,30) scale(1.5)">
+              <Icon color={color} />
+            </g>
+          </>
+        ) : (
+          <g transform="translate(32,26) scale(1.9)">
+            <Icon color={color} />
+          </g>
+        )}
+      </svg>
     </span>
   );
 }
 
-/** Singles or doubles, as an explicit chip. The clearest of the three signals. */
+/** Singles or doubles in words, for places where the badge alone is too subtle. */
 export function FormatChip({ format }: { format: string }) {
   const doubles = format === "doubles";
   return (
