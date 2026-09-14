@@ -1,5 +1,6 @@
 "use client";
 
+import { formatPhone } from "@/lib/format";
 import { PasswordField } from "@/components/password-field";
 import { useState } from "react";
 import { createClient } from "@/lib/supabase/client";
@@ -71,7 +72,7 @@ export function SettingsClient({ userId, email, profile, stats }: Props) {
         .update({
           full_name: fullName.trim(),
           display_name: displayName.trim() || null,
-          phone: phone.trim() || null,
+          phone: formatPhone(phone.trim()) || null,
           rating: rating || null,
         })
         .eq("id", userId);
@@ -151,7 +152,16 @@ export function SettingsClient({ userId, email, profile, stats }: Props) {
           </div>
           <div>
             <label className="text-chalk-dim text-xs font-display uppercase">Phone (optional)</label>
-            <input value={phone} onChange={(e) => setPhone(e.target.value)} placeholder="(555) 555-5555" className="w-full mt-1 bg-court-deep border border-white/10 rounded-lg px-3 py-2 text-sm" />
+            <input
+              value={phone}
+              onChange={(e) => setPhone(e.target.value)}
+              // Tidied when they finish rather than as they type: reformatting
+              // mid-entry fights the cursor and makes backspace behave oddly.
+              onBlur={() => setPhone(formatPhone(phone))}
+              placeholder="555-555-5555"
+              inputMode="tel"
+              className="w-full mt-1 bg-court-deep border border-white/10 rounded-lg px-3 py-2 text-sm"
+            />
             {/* Says plainly who sees it. Handing over a phone number without
                 being told where it appears is not a fair trade. */}
             <p className="text-chalk-dim text-xs mt-1">
