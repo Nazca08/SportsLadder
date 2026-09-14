@@ -4,6 +4,7 @@ import { isValidSet, resolveTennisMatch } from "./tennis";
 import { resolvePickleballMatch, isValidGame } from "./pickleball";
 import { rankStandings, seedPositions, nextPowerOfTwo, type StandingsRow } from "./standings";
 import { matchPoints, winMultiplier, lossPenalty, BASE_PENALTY, POINTS_PER_GAME } from "./elo";
+import { formatPhone } from "../format";
 import { resolveAnnualEntrants, type SeasonQualifiers } from "./annual-championship";
 
 describe("computePoints", () => {
@@ -473,5 +474,34 @@ describe("two_sets_to_6", () => {
     const avg = sum / sets.length;
     expect(avg).toBe(sum);
     expect(matchPoints(avg, 6, 3.5, 3.5)).toEqual(matchPoints(sum, 6, 3.5, 3.5));
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Phone display
+// ---------------------------------------------------------------------------
+describe("formatPhone", () => {
+  it("groups ten digits", () => {
+    expect(formatPhone("9805555955")).toBe("980-555-5955");
+  });
+
+  it("normalises whatever separators were typed", () => {
+    expect(formatPhone("(980) 555-5955")).toBe("980-555-5955");
+    expect(formatPhone("980.555.5955")).toBe("980-555-5955");
+  });
+
+  it("drops a leading US country code", () => {
+    expect(formatPhone("+1 980 555 5955")).toBe("980-555-5955");
+  });
+
+  it("leaves anything it does not recognise exactly as typed", () => {
+    // Mangling an international number is worse than leaving it alone.
+    expect(formatPhone("+44 20 7946 0958")).toBe("+44 20 7946 0958");
+    expect(formatPhone("555-1234")).toBe("555-1234");
+  });
+
+  it("handles a missing number", () => {
+    expect(formatPhone(null)).toBe("");
+    expect(formatPhone("")).toBe("");
   });
 });
