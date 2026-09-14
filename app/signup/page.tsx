@@ -1,12 +1,20 @@
 "use client";
 
-import { useState } from "react";
-import { useRouter } from "next/navigation";
+import { Suspense, useState } from "react";
+import { useRouter, useSearchParams } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
 import { PasswordField } from "@/components/password-field";
 
-export default function SignupPage() {
+/**
+ * useSearchParams forces client-side rendering, which Next refuses to prerender
+ * outside a Suspense boundary. The exported page below provides one.
+ */
+function SignupForm() {
   const router = useRouter();
+  const params = useSearchParams();
+  // Whoever's link brought them here. Passed through to the trigger that
+  // records it; an unknown code is ignored rather than blocking the signup.
+  const ref = (params.get("ref") ?? "").replace(/[^A-Za-z0-9]/g, "").slice(0, 12);
   const supabase = createClient();
   const [name, setName] = useState("");
   const [email, setEmail] = useState("");
@@ -35,7 +43,7 @@ export default function SignupPage() {
       options: {
         // read by the handle_new_user() trigger to create the profiles row --
         // see supabase/migrations/0002_profile_trigger.sql
-        data: { full_name: name.trim(), gender },
+        data: { full_name: name.trim(), gender, ...(ref ? { ref } : {}) },
       },
     });
 
@@ -144,5 +152,19 @@ export default function SignupPage() {
         </div>
       </div>
     </main>
+  );
+}
+
+export default function SignupPage() {
+  return (
+    <Suspense
+      fallback={
+        <main className="min-h-screen flex items-center justify-center p-6">
+          <p className="text-chalk-dim text-sm">Loading…</p>
+        </main>
+      }
+    >
+      <SignupForm />
+    </Suspense>
   );
 }
