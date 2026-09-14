@@ -1,6 +1,6 @@
 "use client";
 
-import { formatTime, formatDate } from "@/lib/format";
+import { formatTime, formatDate, formatPhone } from "@/lib/format";
 import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import {
@@ -27,6 +27,8 @@ type MatchResult = {
   reported_by: string;
   confirmed_by: string | null;
   reporter_entrant_id: string | null;
+  /** Selected already (the query uses *), just never typed until now. */
+  winner_entrant_id?: string | null;
 };
 type StandingsRow = { entrantId: string; points: number; seed: number; earned: number; wins: number; losses: number; played: number };
 
@@ -82,6 +84,55 @@ function TimeField() {
 }
 
 /**
+ * A reported score with both names against it.
+ *
+ * "Reported: 0-6, 6-3, 7-5" is unreadable to the person being asked to confirm
+ * it -- there is no way to tell which column is theirs, so Confirm is a coin
+ * flip. Laying the two names out with their own numbers makes a reversed score
+ * obvious, which is the whole point of asking for confirmation.
+ */
+function ScoreSummary({
+  sets,
+  nameA,
+  nameB,
+  myEntrantId,
+  entrantAId,
+  winnerName,
+}: {
+  sets: { a: number; b: number }[];
+  nameA: string;
+  nameB: string;
+  myEntrantId: string | null;
+  entrantAId: string;
+  winnerName?: string | null;
+}) {
+  const iAmA = myEntrantId ? entrantAId === myEntrantId : null;
+  const row = (label: string, mine: boolean | null, values: number[]) => (
+    <div className="flex items-center gap-2">
+      <span className={`w-28 shrink-0 text-sm truncate ${mine ? "text-chalk font-semibold" : "text-chalk-dim"}`}>
+        {label}
+        {mine && <span className="text-ball text-[10px] ml-1">you</span>}
+      </span>
+      {values.map((v, i) => (
+        <span key={i} className="w-7 text-center font-score text-sm">
+          {v}
+        </span>
+      ))}
+    </div>
+  );
+
+  return (
+    <div className="mb-2">
+      {row(nameA, iAmA === true, sets.map((s) => s.a))}
+      {row(nameB, iAmA === false, sets.map((s) => s.b))}
+      {winnerName && (
+        <p className="text-chalk-dim text-xs mt-1.5">{winnerName} wins.</p>
+      )}
+    </div>
+  );
+}
+
+/**
  * Opponent's phone, on matches you have arranged with them.
  *
  * This is how a match actually happens: confirming the court, saying you are
@@ -100,7 +151,7 @@ function ContactLine({ name, phone }: { name: string; phone: string | null }) {
     <span className="text-xs">
       <span className="text-chalk-dim">{name}: </span>
       <a href={`tel:${phone.replace(/[^\d+]/g, "")}`} className="text-ball hover:underline">
-        {phone}
+        {formatPhone(phone)}
       </a>
     </span>
   );
@@ -602,18 +653,38 @@ function MatchesTab({ sport, matches, resultsByMatch, name, myEntrantId, scoring
                 />
               )}
               {result && !result.confirmed_by && result.reporter_entrant_id === myEntrantId && (
-                <div className="flex items-center gap-3 flex-wrap">
-                  <span className="text-sm">Sent: {result.sets.map((s) => `${s.a}-${s.b}`).join(", ")}</span>
-                  <span className="text-chalk-dim text-xs">
+                <div>
+                  <ScoreSummary
+                    sets={result.sets}
+                    nameA={name(m.entrant_a_id)}
+                    nameB={m.entrant_b_id ? name(m.entrant_b_id) : "Opponent"}
+                    myEntrantId={myEntrantId}
+                    entrantAId={m.entrant_a_id}
+                    winnerName={result.winner_entrant_id ? name(result.winner_entrant_id) : null}
+                  />
+                  <p className="text-chalk-dim text-xs">
                     Waiting on {m.entrant_a_id === myEntrantId && m.entrant_b_id ? name(m.entrant_b_id) : name(m.entrant_a_id)} to confirm.
-                  </span>
+                  </p>
                 </div>
               )}
               {result && !result.confirmed_by && result.reporter_entrant_id !== myEntrantId && (
-                <div className="flex items-center gap-3 flex-wrap">
-                  <span className="text-sm">Reported: {result.sets.map((s) => `${s.a}-${s.b}`).join(", ")}</span>
-                  <button onClick={() => run(() => confirmScore(m.id))} className="bg-ball text-ink font-display text-xs font-semibold rounded px-3 py-1.5">Confirm</button>
-                  <button onClick={() => run(() => disputeScore(m.id))} className="border border-white/10 rounded px-3 py-1.5 text-xs">Dispute</button>
+                <div>
+                  <p className="text-chalk-dim text-xs mb-1.5">
+                    {result.reporter_entrant_id ? name(result.reporter_entrant_id) : "Your opponent"}{" "}
+                    reported this score. Check it before you confirm.
+                  </p>
+                  <ScoreSummary
+                    sets={result.sets}
+                    nameA={name(m.entrant_a_id)}
+                    nameB={m.entrant_b_id ? name(m.entrant_b_id) : "Opponent"}
+                    myEntrantId={myEntrantId}
+                    entrantAId={m.entrant_a_id}
+                    winnerName={result.winner_entrant_id ? name(result.winner_entrant_id) : null}
+                  />
+                  <div className="flex items-center gap-3 flex-wrap">
+                    <button onClick={() => run(() => confirmScore(m.id))} className="bg-ball text-ink font-display text-xs font-semibold rounded px-3 py-1.5">Confirm</button>
+                    <button onClick={() => run(() => disputeScore(m.id))} className="border border-white/10 rounded px-3 py-1.5 text-xs">Dispute</button>
+                  </div>
                 </div>
               )}
             </div>
