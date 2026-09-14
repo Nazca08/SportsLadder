@@ -1,6 +1,6 @@
 import { redirect, notFound } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
-import { getMyEntrantId, getEntrantNames, getEntrantAvatars, getEntrantRatings, getEntrantIdForUserInMatch } from "@/lib/leagues/entrants";
+import { getMyEntrantId, getEntrantNames, getEntrantAvatars, getEntrantRatings, getEntrantPhones, getEntrantIdForUserInMatch } from "@/lib/leagues/entrants";
 import { computeLeagueStandings } from "@/lib/leagues/standings";
 import { SignOutButton } from "@/components/sign-out-button";
 import { LeaveLeagueButton } from "@/components/leave-league-button";
@@ -62,6 +62,7 @@ export default async function LeaguePage({
   const entrantNames = await getEntrantNames(supabase, leagueSeasonId);
   const entrantAvatars = await getEntrantAvatars(supabase, leagueSeasonId);
   const entrantRatings = await getEntrantRatings(supabase, leagueSeasonId);
+  const entrantPhones = await getEntrantPhones(supabase, leagueSeasonId);
   const { rows: standings, deltaByMatch } = await computeLeagueStandings(supabase, leagueSeasonId);
 
   const { data: allMatches } = await supabase
@@ -121,6 +122,7 @@ export default async function LeaguePage({
         entrantNames={Object.fromEntries(entrantNames)}
         entrantAvatars={Object.fromEntries(entrantAvatars)}
         entrantRatings={Object.fromEntries(entrantRatings)}
+        entrantPhones={Object.fromEntries(entrantPhones)}
         showRatings={(template as any)?.level === "open"}
         scoringFormat={((template as any)?.scoring_format ?? "standard") as "standard" | "single_set" | "best_of_3_avg" | "two_sets_to_6"}
         standings={standings}
