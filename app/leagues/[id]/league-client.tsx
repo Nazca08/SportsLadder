@@ -81,6 +81,31 @@ function TimeField() {
   );
 }
 
+/**
+ * Opponent's phone, on matches you have arranged with them.
+ *
+ * This is how a match actually happens: confirming the court, saying you are
+ * ten minutes away, calling off in the rain. A tel: link so it dials straight
+ * from a phone.
+ */
+function ContactLine({ name, phone }: { name: string; phone: string | null }) {
+  if (!phone) {
+    return (
+      <span className="text-chalk-dim text-xs">
+        {name} hasn&apos;t added a phone number
+      </span>
+    );
+  }
+  return (
+    <span className="text-xs">
+      <span className="text-chalk-dim">{name}: </span>
+      <a href={`tel:${phone.replace(/[^\d+]/g, "")}`} className="text-ball hover:underline">
+        {phone}
+      </a>
+    </span>
+  );
+}
+
 /** Rating chip shown beside a name in open leagues. */
 function RatingBadge({ rating }: { rating: string | null }) {
   if (!rating) return null;
@@ -142,6 +167,7 @@ type Props = {
   leagueSeasonId: string;
   defaultLocation: string;
   entrantRatings: Record<string, string | null>;
+  entrantPhones: Record<string, string | null>;
   showRatings: boolean;
   scoringFormat: "standard" | "single_set" | "best_of_3_avg" | "two_sets_to_6";
   deltaByMatch: Record<string, { a: number; b: number }>;
@@ -201,10 +227,19 @@ function ScoreForm({
   sport,
   onSubmit,
   scoringFormat = "standard",
+  nameA,
+  nameB,
+  iAmA,
 }: {
   sport: "tennis" | "pickleball";
   onSubmit: (payload: any) => void;
   scoringFormat?: "standard" | "single_set" | "best_of_3_avg" | "two_sets_to_6";
+  /** Left column. Always entrant A, matching the order the score is stored in. */
+  nameA?: string;
+  /** Right column: entrant B. */
+  nameB?: string;
+  /** True when the person filling this in is entrant A, so their column can be marked. */
+  iAmA?: boolean;
 }) {
   // A pro set is the whole match, so the form opens with one row and does not
   // offer to add more.
@@ -237,15 +272,55 @@ function ScoreForm({
 
   return (
     <div>
-      <div className="flex flex-wrap items-center gap-3 mb-2">
+      {/* Names sit above their own column. The boxes were previously unlabelled
+          and laid out side by side, so there was no way to tell whose score went
+          where -- and a reversed score is recorded silently, with nothing on
+          screen afterwards to reveal it. */}
+      <div className="mb-2">
+        <div className="flex items-end gap-2 mb-1">
+          <span className="w-14 shrink-0" />
+          <span className="w-14 text-center text-xs font-semibold leading-tight break-words">
+            {nameA ?? "Player 1"}
+            {iAmA === true && <span className="block text-ball text-[10px]">you</span>}
+          </span>
+          <span className="w-3 shrink-0" />
+          <span className="w-14 text-center text-xs font-semibold leading-tight break-words">
+            {nameB ?? "Player 2"}
+            {iAmA === false && <span className="block text-ball text-[10px]">you</span>}
+          </span>
+        </div>
+
         {rounds.map((r, i) => (
-          <div key={i} className="flex items-center gap-1">
-            <span className="text-chalk-dim text-xs">{singleSet ? label : `${label} ${i + 1}`}</span>
-            <input type="number" min="0" value={r.a} onChange={(e) => updateRound(i, "a", e.target.value)} className="w-12 bg-court-deep border border-white/10 rounded px-1 py-1 text-center text-sm" />
-            <span className="text-chalk-dim">-</span>
-            <input type="number" min="0" value={r.b} onChange={(e) => updateRound(i, "b", e.target.value)} className="w-12 bg-court-deep border border-white/10 rounded px-1 py-1 text-center text-sm" />
+          <div key={i} className="flex items-center gap-2 mb-1.5">
+            <span className="w-14 shrink-0 text-chalk-dim text-xs">
+              {singleSet ? label : `${label} ${i + 1}`}
+            </span>
+            <input
+              type="number"
+              min="0"
+              inputMode="numeric"
+              aria-label={`${nameA ?? "Player 1"} ${label.toLowerCase()} ${i + 1}`}
+              value={r.a}
+              onChange={(e) => updateRound(i, "a", e.target.value)}
+              className="w-14 bg-court-deep border border-white/10 rounded px-1 py-1.5 text-center text-sm"
+            />
+            <span className="w-3 shrink-0 text-center text-chalk-dim">-</span>
+            <input
+              type="number"
+              min="0"
+              inputMode="numeric"
+              aria-label={`${nameB ?? "Player 2"} ${label.toLowerCase()} ${i + 1}`}
+              value={r.b}
+              onChange={(e) => updateRound(i, "b", e.target.value)}
+              className="w-14 bg-court-deep border border-white/10 rounded px-1 py-1.5 text-center text-sm"
+            />
             {!singleSet && rounds.length > 1 && (
-              <button type="button" onClick={() => removeRound(i)} className="text-chalk-dim text-xs px-1" aria-label={`Remove ${label.toLowerCase()} ${i + 1}`}>
+              <button
+                type="button"
+                onClick={() => removeRound(i)}
+                className="text-chalk-dim text-xs px-1 hover:text-paddle"
+                aria-label={`Remove ${label.toLowerCase()} ${i + 1}`}
+              >
                 &times;
               </button>
             )}
@@ -288,7 +363,7 @@ function ScoreForm({
   );
 }
 
-export function LeagueClient({ leagueSeasonId, sport, myEntrantId, entrantNames, entrantAvatars, standings, matches, resultsByMatch, defaultLocation, entrantRatings, showRatings, scoringFormat, deltaByMatch }: Props) {
+export function LeagueClient({ leagueSeasonId, sport, myEntrantId, entrantNames, entrantAvatars, standings, matches, resultsByMatch, defaultLocation, entrantRatings, entrantPhones, showRatings, scoringFormat, deltaByMatch }: Props) {
   /** Rating badge text for an entrant, or null when this league does not use them. */
   const ratingOf = (id: string) => (showRatings ? entrantRatings[id] ?? null : null);
   const [tab, setTab] = useState<"rankings" | "offers" | "challenges" | "matches">("rankings");
@@ -311,7 +386,7 @@ export function LeagueClient({ leagueSeasonId, sport, myEntrantId, entrantNames,
       {tab === "rankings" && <RankingsTab standings={standings} name={name} avatar={(id: string) => entrantAvatars[id] ?? null} myEntrantId={myEntrantId} ratingOf={ratingOf} />}
       {tab === "offers" && <OffersTab leagueSeasonId={leagueSeasonId} matches={matches} name={name} avatar={(id: string) => entrantAvatars[id] ?? null} rank={rank} myEntrantId={myEntrantId} defaultLocation={defaultLocation} ratingOf={ratingOf} />}
       {tab === "challenges" && <ChallengesTab leagueSeasonId={leagueSeasonId} matches={matches} standings={standings} name={name} avatar={(id: string) => entrantAvatars[id] ?? null} rank={rank} myEntrantId={myEntrantId} defaultLocation={defaultLocation} ratingOf={ratingOf} />}
-      {tab === "matches" && <MatchesTab sport={sport} matches={matches} resultsByMatch={resultsByMatch} name={name} myEntrantId={myEntrantId} scoringFormat={scoringFormat} deltaByMatch={deltaByMatch} />}
+      {tab === "matches" && <MatchesTab sport={sport} matches={matches} resultsByMatch={resultsByMatch} name={name} myEntrantId={myEntrantId} scoringFormat={scoringFormat} deltaByMatch={deltaByMatch} entrantPhones={entrantPhones} />}
     </div>
   );
 }
@@ -485,7 +560,7 @@ function ChallengesTab({ leagueSeasonId, matches, standings, name, avatar, rank,
   );
 }
 
-function MatchesTab({ sport, matches, resultsByMatch, name, myEntrantId, scoringFormat, deltaByMatch }: { sport: "tennis" | "pickleball"; matches: Match[]; resultsByMatch: Record<string, MatchResult>; name: (id: string) => string; myEntrantId: string | null; scoringFormat: "standard" | "single_set" | "best_of_3_avg" | "two_sets_to_6"; deltaByMatch: Record<string, { a: number; b: number }> }) {
+function MatchesTab({ sport, matches, resultsByMatch, name, myEntrantId, scoringFormat, deltaByMatch, entrantPhones }: { sport: "tennis" | "pickleball"; matches: Match[]; resultsByMatch: Record<string, MatchResult>; name: (id: string) => string; myEntrantId: string | null; scoringFormat: "standard" | "single_set" | "best_of_3_avg" | "two_sets_to_6"; deltaByMatch: Record<string, { a: number; b: number }>; entrantPhones: Record<string, string | null> }) {
   const { run, error } = useAction();
 
   const scheduled = matches.filter((m) => m.status === "scheduled" && (m.entrant_a_id === myEntrantId || m.entrant_b_id === myEntrantId));
@@ -505,8 +580,26 @@ function MatchesTab({ sport, matches, resultsByMatch, name, myEntrantId, scoring
               <div className="text-chalk-dim text-xs mb-2">
                 {name(m.entrant_a_id)} vs {m.entrant_b_id ? name(m.entrant_b_id) : "\u2014"} &middot; {formatDate(m.scheduled_date)} {formatTime(m.scheduled_time)} &middot; {m.location}
               </div>
+              {/* Only the other side's number, and only on a match you are in. */}
+              {myEntrantId && m.entrant_b_id && (
+                <div className="mb-2">
+                  {(() => {
+                    const other =
+                      m.entrant_a_id === myEntrantId ? m.entrant_b_id : m.entrant_a_id;
+                    if (other === myEntrantId) return null;
+                    return <ContactLine name={name(other)} phone={entrantPhones[other] ?? null} />;
+                  })()}
+                </div>
+              )}
               {!result && (
-                <ScoreForm sport={sport} scoringFormat={scoringFormat} onSubmit={(payload) => run(() => reportScore(m.id, payload))} />
+                <ScoreForm
+                  sport={sport}
+                  scoringFormat={scoringFormat}
+                  nameA={name(m.entrant_a_id)}
+                  nameB={m.entrant_b_id ? name(m.entrant_b_id) : "Opponent"}
+                  iAmA={myEntrantId ? m.entrant_a_id === myEntrantId : undefined}
+                  onSubmit={(payload) => run(() => reportScore(m.id, payload))}
+                />
               )}
               {result && !result.confirmed_by && result.reporter_entrant_id === myEntrantId && (
                 <div className="flex items-center gap-3 flex-wrap">
