@@ -121,3 +121,34 @@ export async function getEntrantRatings(
   const { data: profiles } = await supabase.from("profiles").select("id, rating").in("id", playerIds);
   return new Map((profiles ?? []).map((p) => [p.id, (p as any).rating ?? null]));
 }
+
+/**
+ * Phone numbers for the players in a league.
+ *
+ * Shown only to people who already have a match arranged with each other --
+ * that is the point of it, coordinating where to meet and letting someone know
+ * you are running late. A league-wide directory would expose every member's
+ * number to every other member, which is a much bigger thing to hand over than
+ * anyone signing up expects.
+ *
+ * Singles only: a doubles entrant is a team, and a team has two numbers.
+ */
+export async function getEntrantPhones(
+  supabase: SupabaseClient,
+  leagueSeasonId: string
+): Promise<Map<string, string | null>> {
+  const { data: enrollments } = await supabase
+    .from("enrollments")
+    .select("player_id")
+    .eq("league_season_id", leagueSeasonId);
+
+  const playerIds = (enrollments ?? []).map((e) => e.player_id).filter(Boolean) as string[];
+  if (playerIds.length === 0) return new Map();
+
+  const { data: profiles } = await supabase
+    .from("profiles")
+    .select("id, phone")
+    .in("id", playerIds);
+
+  return new Map((profiles ?? []).map((p) => [p.id, (p as any).phone ?? null]));
+}
