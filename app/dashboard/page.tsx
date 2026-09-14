@@ -42,6 +42,7 @@ export default async function DashboardPage() {
         <h1 className="font-display text-2xl font-bold">Welcome, {profile?.full_name ?? "player"}.</h1>
         <div className="flex items-center gap-4">
           {profile?.is_admin && <a href="/admin" className="text-ball text-sm hover:opacity-80">Admin</a>}
+          <a href="/invite" className="text-chalk-dim text-sm hover:text-chalk">Invite</a>
           <a href="/settings" className="text-chalk-dim text-sm hover:text-chalk">Settings</a>
           <SignOutButton />
         </div>
