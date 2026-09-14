@@ -59,7 +59,17 @@ const LADDER = [
   { rank: "5", name: "Barrera, J.", record: "7-5" },
 ];
 
-export default async function Home() {
+export default async function Home({
+  searchParams,
+}: {
+  searchParams?: { ref?: string };
+}) {
+  // A referral code arrives as ?ref=CODE and has to survive the trip to the
+  // signup form, which is where it gets attached to the new account. Carried in
+  // the link rather than a cookie: no consent banner, and it still works if the
+  // visitor comes back in a different browser from the same message.
+  const ref = (searchParams?.ref ?? "").replace(/[^A-Za-z0-9]/g, "").slice(0, 12);
+  const signupHref = ref ? `/signup?ref=${ref}` : "/signup";
   const supabase = createClient();
   const {
     data: { user },
@@ -84,7 +94,7 @@ export default async function Home() {
               Log in
             </a>
             <a
-              href="/signup"
+              href={signupHref}
               className="rounded-lg bg-ball px-4 py-2 font-display text-sm font-semibold tracking-wide text-ink transition-opacity hover:opacity-90 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ball"
             >
               Sign up
@@ -121,7 +131,7 @@ export default async function Home() {
             </p>
             <div className="mt-9 flex flex-wrap items-center gap-3">
               <a
-                href="/signup"
+                href={signupHref}
                 className="rounded-xl bg-ball px-7 py-3.5 font-display text-base font-semibold tracking-wide text-ink transition-opacity hover:opacity-90 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ball"
               >
                 Join a league
@@ -376,7 +386,7 @@ export default async function Home() {
             at checkout and it is {PROMO_BLURB}.
           </p>
           <a
-            href="/signup"
+            href={signupHref}
             className="mt-9 inline-block rounded-xl bg-ball px-9 py-4 font-display text-lg font-semibold tracking-wide text-ink transition-opacity hover:opacity-90 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ball"
           >
             Join a league
@@ -394,7 +404,7 @@ export default async function Home() {
             <a href="/login" className="transition-colors hover:text-chalk">
               LOG IN
             </a>
-            <a href="/signup" className="transition-colors hover:text-chalk">
+            <a href={signupHref} className="transition-colors hover:text-chalk">
               SIGN UP
             </a>
           </div>
