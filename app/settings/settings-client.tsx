@@ -152,6 +152,12 @@ export function SettingsClient({ userId, email, profile, stats }: Props) {
           <div>
             <label className="text-chalk-dim text-xs font-display uppercase">Phone (optional)</label>
             <input value={phone} onChange={(e) => setPhone(e.target.value)} placeholder="(555) 555-5555" className="w-full mt-1 bg-court-deep border border-white/10 rounded-lg px-3 py-2 text-sm" />
+            {/* Says plainly who sees it. Handing over a phone number without
+                being told where it appears is not a fair trade. */}
+            <p className="text-chalk-dim text-xs mt-1">
+              Shown only to opponents you have a scheduled match with, so you can sort out
+              the court or call off in the rain. Nobody else in the league sees it.
+            </p>
           </div>
           {profileError && <div className="text-paddle text-xs">{profileError}</div>}
           {profileSaved && <div className="text-ball text-xs">Saved.</div>}
