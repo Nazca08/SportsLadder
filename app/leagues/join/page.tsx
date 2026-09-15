@@ -59,7 +59,7 @@ export default async function JoinLeaguePage() {
       <p className="text-chalk-dim text-sm mb-6">
         Pick your city and sport, then choose from the leagues running there.
       </p>
-      <JoinLeagueForm leagues={leagues ?? []} joinedTemplateIds={joinedTemplateIds} />
+      <JoinLeagueForm leagues={leagues ?? []} joinedTemplateIds={joinedTemplateIds} gender={(profile?.gender as "male" | "female") ?? "female"} />
     </main>
   );
 }
