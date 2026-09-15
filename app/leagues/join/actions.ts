@@ -142,14 +142,15 @@ export async function joinLeague(formData: FormData) {
 export async function resumeCheckoutFromForm(formData: FormData) {
   const enrollmentId = String(formData.get("enrollmentId") ?? "");
   if (!enrollmentId) throw new Error("Missing enrollment id.");
-  await resumeCheckout(enrollmentId);
+  // Set when somebody chooses to cover their partner's share as well.
+  await resumeCheckout(enrollmentId, formData.get("coverPartner") === "1");
 }
 
 /**
  * Restarts checkout for an enrollment that was created but never paid for --
  * the player closed the Stripe tab, or their card was declined.
  */
-export async function resumeCheckout(enrollmentId: string) {
+export async function resumeCheckout(enrollmentId: string, coverPartner = false) {
   const { supabase, user } = await getAuthedClient();
   if (!supabase || !user) redirect("/login");
 
@@ -157,24 +158,61 @@ export async function resumeCheckout(enrollmentId: string) {
   // start a checkout for somebody else's enrollment.
   const { data: enrollment } = await supabase
     .from("enrollments")
-    .select("id, paid, league_seasons(league_templates(sport, format, division, level, area, name))")
+    .select("id, paid, team_id, league_seasons(league_templates(sport, format, division, level, area, name))")
     .eq("id", enrollmentId)
     .single();
 
   if (!enrollment) throw new Error("Enrollment not found.");
   if (enrollment.paid) redirect(`/leagues/${enrollmentId}`);
 
+  // Guards against a second charge. In doubles the enrollment stays unpaid
+  // until both halves are in, so "not paid" is not the same as "you have not
+  // paid" -- without this, the partner who paid first could be charged again
+  // just by reloading the page.
+  const { data: alreadyPaid } = await supabase
+    .from("payments")
+    .select("id")
+    .eq("enrollment_id", enrollmentId)
+    .eq("player_id", user.id)
+    .eq("status", "paid")
+    .maybeSingle();
+  if (alreadyPaid) redirect(`/leagues/${enrollmentId}`);
+
   const ls: any = Array.isArray(enrollment.league_seasons)
     ? enrollment.league_seasons[0]
     : enrollment.league_seasons;
   const t: any = Array.isArray(ls?.league_templates) ? ls.league_templates[0] : ls?.league_templates;
+
+  // Who else this payment should settle. Only ever the other half of a doubles
+  // pair, and only if they have not already paid.
+  let covers: string[] = [];
+  if (coverPartner && (enrollment as any).team_id) {
+    const { data: team } = await supabase
+      .from("teams")
+      .select("player1_id, player2_id")
+      .eq("id", (enrollment as any).team_id)
+      .maybeSingle();
+    const partnerId =
+      team?.player1_id === user.id ? team?.player2_id : team?.player1_id;
+    if (partnerId) {
+      const { data: partnerPaid } = await supabase
+        .from("payments")
+        .select("id")
+        .eq("enrollment_id", enrollmentId)
+        .eq("player_id", partnerId)
+        .eq("status", "paid")
+        .maybeSingle();
+      if (!partnerPaid) covers = [partnerId as string];
+    }
+  }
 
   const checkoutUrl = await createCheckoutUrl(
     enrollmentId,
     t?.format ?? "singles",
     t ? leagueLabel(t) : "League entry",
     user.email ?? undefined,
-    user.id
+    user.id,
+    covers
   );
   redirect(checkoutUrl);
 }
