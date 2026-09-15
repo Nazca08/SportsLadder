@@ -5,6 +5,7 @@ import { joinLeague, searchPlayers, type PlayerSearchResult } from "./actions";
 import { leagueLabel } from "@/lib/leagues/label";
 import { LeagueBadge, FormatChip } from "@/components/league-badge";
 import { AREAS } from "@/lib/leagues/divisions";
+import { InvitePartner } from "@/components/invite-partner";
 
 export type CatalogueLeague = {
   id: string;
@@ -34,12 +35,17 @@ export function JoinLeagueForm({
   leagues = [],
   joinedTemplateIds = [],
   gender = "female",
+  referralUrl,
+  myName,
 }: {
   leagues?: CatalogueLeague[];
   /** Leagues this player is already in, shown as joined rather than offered again. */
   joinedTemplateIds?: string[];
   /** Used to hide leagues for the other gender. */
   gender?: "male" | "female";
+  /** This player's referral link, for inviting a partner who has no account. */
+  referralUrl?: string;
+  myName?: string;
 }) {
   const [area, setArea] = useState("");
   const [sport, setSport] = useState("");
@@ -49,6 +55,7 @@ export function JoinLeagueForm({
   const [partnerResults, setPartnerResults] = useState<PlayerSearchResult[]>([]);
   const [partner, setPartner] = useState<PlayerSearchResult | null>(null);
   const [searching, setSearching] = useState(false);
+  const [noMatches, setNoMatches] = useState(false);
 
   const [error, setError] = useState("");
   const [pending, startTransition] = useTransition();
@@ -73,13 +80,18 @@ export function JoinLeagueForm({
   async function handlePartnerSearch(value: string) {
     setPartnerQuery(value);
     setPartner(null);
+    setNoMatches(false);
     if (value.trim().length < 2) {
       setPartnerResults([]);
       return;
     }
     setSearching(true);
     try {
-      setPartnerResults(await searchPlayers(value));
+      const results = await searchPlayers(value);
+      setPartnerResults(results);
+      // Distinguishes "nobody by that name" from "you have not typed enough
+      // yet", so the invite prompt only appears when it is actually the answer.
+      setNoMatches(results.length === 0);
     } finally {
       setSearching(false);
     }
@@ -203,9 +215,22 @@ export function JoinLeagueForm({
             className="w-full bg-court-deep border border-white/10 rounded-lg px-3 py-2 text-sm"
           />
           <p className="text-chalk-dim text-xs mt-1">
-            Your partner needs to have already signed up.
+            Your partner needs a RallyRank account before you can enter together.
           </p>
           {searching && <p className="text-chalk-dim text-xs mt-1">Searching…</p>}
+
+          {/* An empty search used to be a dead end: no results, no explanation,
+              no way to join a doubles league at all. Now it becomes the next
+              step. */}
+          {noMatches && !searching && !partner && referralUrl && (
+            <div className="mt-3">
+              <InvitePartner
+                url={referralUrl}
+                myName={myName ?? "A player"}
+                searchedFor={partnerQuery.trim()}
+              />
+            </div>
+          )}
           {partnerResults.length > 0 && !partner && (
             <div className="mt-2 space-y-1">
               {partnerResults.map((p) => (
