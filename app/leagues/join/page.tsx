@@ -11,7 +11,7 @@ export default async function JoinLeaguePage() {
 
   const { data: profile } = await supabase
     .from("profiles")
-    .select("gender, rating")
+    .select("gender, rating, full_name, display_name, referral_code")
     .eq("id", user.id)
     .single();
 
@@ -37,6 +37,15 @@ export default async function JoinLeaguePage() {
     )
     .filter(Boolean) as string[];
 
+  // The player's own referral link, so an invite sent from here also credits
+  // them with the signup.
+  const base = (process.env.NEXT_PUBLIC_SITE_URL ?? "https://rallyrank.club").replace(/\/$/, "");
+  const referralUrl = (profile as any)?.referral_code
+    ? `${base}/?ref=${(profile as any).referral_code}`
+    : base;
+  const myName =
+    (profile as any)?.display_name || (profile as any)?.full_name || "A player";
+
   return (
     <main className="min-h-screen p-8 max-w-lg mx-auto">
       <a
@@ -59,7 +68,7 @@ export default async function JoinLeaguePage() {
       <p className="text-chalk-dim text-sm mb-6">
         Pick your city and sport, then choose from the leagues running there.
       </p>
-      <JoinLeagueForm leagues={leagues ?? []} joinedTemplateIds={joinedTemplateIds} gender={(profile?.gender as "male" | "female") ?? "female"} />
+      <JoinLeagueForm leagues={leagues ?? []} joinedTemplateIds={joinedTemplateIds} gender={(profile?.gender as "male" | "female") ?? "female"} referralUrl={referralUrl} myName={myName} />
     </main>
   );
 }
