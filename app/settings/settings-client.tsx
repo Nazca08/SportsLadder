@@ -1,12 +1,22 @@
 "use client";
 
 import { formatPhone } from "@/lib/format";
+
+const RATINGS = ["2.0", "2.5", "3.0", "3.5", "4.0", "4.5", "5.0"];
 import { PasswordField } from "@/components/password-field";
 import { useState } from "react";
 import { createClient } from "@/lib/supabase/client";
 import type { PlayerStats } from "@/lib/leagues/player-stats";
 
-type Profile = { fullName: string; displayName: string; phone: string; avatarUrl: string; rating: string };
+type Profile = {
+  fullName: string;
+  displayName: string;
+  phone: string;
+  avatarUrl: string;
+  ratingTennis: string;
+  ratingPickleball: string;
+  gender: "male" | "female";
+};
 
 type Props = {
   userId: string;
@@ -25,7 +35,9 @@ export function SettingsClient({ userId, email, profile, stats }: Props) {
   const [fullName, setFullName] = useState(profile.fullName);
   const [displayName, setDisplayName] = useState(profile.displayName);
   const [phone, setPhone] = useState(profile.phone);
-  const [rating, setRating] = useState(profile.rating);
+  const [ratingTennis, setRatingTennis] = useState(profile.ratingTennis);
+  const [ratingPickleball, setRatingPickleball] = useState(profile.ratingPickleball);
+  const [gender, setGender] = useState(profile.gender);
   const [profileSaving, setProfileSaving] = useState(false);
   const [profileSaved, setProfileSaved] = useState(false);
   const [profileError, setProfileError] = useState("");
@@ -73,7 +85,9 @@ export function SettingsClient({ userId, email, profile, stats }: Props) {
           full_name: fullName.trim(),
           display_name: displayName.trim() || null,
           phone: formatPhone(phone.trim()) || null,
-          rating: rating || null,
+          rating_tennis: ratingTennis || null,
+          rating_pickleball: ratingPickleball || null,
+          gender,
         })
         .eq("id", userId);
       if (error) throw error;
@@ -171,20 +185,51 @@ export function SettingsClient({ userId, email, profile, stats }: Props) {
           </div>
           {profileError && <div className="text-paddle text-xs">{profileError}</div>}
           {profileSaved && <div className="text-ball text-xs">Saved.</div>}
-          <label className="block text-chalk-dim text-xs mb-1">Your rating</label>
+          <label className="block text-chalk-dim text-xs mb-1">Your ratings</label>
+          <div className="grid grid-cols-2 gap-2">
+            <div>
+              <span className="block text-chalk-dim text-[11px] mb-1">Tennis</span>
+              <select
+                value={ratingTennis}
+                onChange={(e) => setRatingTennis(e.target.value)}
+                className="w-full bg-court-deep border border-white/10 rounded-lg px-2 py-2 text-sm"
+              >
+                <option value="">Not set</option>
+                {RATINGS.map((r) => <option key={r} value={r}>{r}</option>)}
+              </select>
+            </div>
+            <div>
+              <span className="block text-chalk-dim text-[11px] mb-1">Pickleball</span>
+              <select
+                value={ratingPickleball}
+                onChange={(e) => setRatingPickleball(e.target.value)}
+                className="w-full bg-court-deep border border-white/10 rounded-lg px-2 py-2 text-sm"
+              >
+                <option value="">Not set</option>
+                {RATINGS.map((r) => <option key={r} value={r}>{r}</option>)}
+              </select>
+            </div>
+          </div>
+          {/* Two ratings because they are often genuinely different: the scoring
+              uses whichever matches the sport being played. */}
+          <p className="text-chalk-dim text-xs mb-4 mt-1">
+            Shown next to your name in the standings. Every league mixes all ratings, so
+            this is how opponents know what kind of match to expect &mdash; and it decides
+            how much a win over you is worth.
+          </p>
+
+          <label className="block text-chalk-dim text-xs mb-1">Gender</label>
           <select
-            value={rating}
-            onChange={(e) => setRating(e.target.value)}
-            className="w-full bg-court-deep border border-white/10 rounded-lg px-2 py-2 text-sm mb-1"
+            value={gender}
+            onChange={(e) => setGender(e.target.value as "male" | "female")}
+            className="w-full bg-court-deep border border-white/10 rounded-lg px-2 py-2 text-sm"
           >
-            <option value="">Not set</option>
-            {["2.0", "2.5", "3.0", "3.5", "4.0", "4.5", "5.0"].map((r) => (
-              <option key={r} value={r}>{r}</option>
-            ))}
+            <option value="female">Female</option>
+            <option value="male">Male</option>
           </select>
-          <p className="text-chalk-dim text-xs mb-4">
-            Shown next to your name in open leagues, where players of every rating share
-            one ladder, so opponents know what kind of match to expect.
+          <p className="text-chalk-dim text-xs mb-4 mt-1">
+            Decides which leagues you can join. Changing it does not move you out of
+            leagues you are already in.
           </p>
 
           <button
