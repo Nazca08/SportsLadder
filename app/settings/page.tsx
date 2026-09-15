@@ -11,7 +11,7 @@ export default async function SettingsPage() {
 
   const { data: profile } = await supabase
     .from("profiles")
-    .select("full_name, display_name, phone, avatar_url, gender, rating")
+    .select("full_name, display_name, phone, avatar_url, gender, rating, rating_tennis, rating_pickleball")
     .eq("id", user.id)
     .single();
 
@@ -34,7 +34,9 @@ export default async function SettingsPage() {
           displayName: profile?.display_name ?? "",
           phone: profile?.phone ?? "",
           avatarUrl: profile?.avatar_url ?? "",
-          rating: profile?.rating ?? "",
+          ratingTennis: (profile as any)?.rating_tennis ?? profile?.rating ?? "",
+          ratingPickleball: (profile as any)?.rating_pickleball ?? profile?.rating ?? "",
+          gender: ((profile?.gender as "male" | "female") ?? "female"),
         }}
         stats={stats}
       />
