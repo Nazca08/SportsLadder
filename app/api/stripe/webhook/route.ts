@@ -70,27 +70,71 @@ export async function POST(req: Request) {
 
   // Service role, so this bypasses RLS -- which is what we want. There is no
   // signed-in user in a webhook request.
-  const { error: enrollError } = await admin
-    .from("enrollments")
-    .update({ paid: true })
-    .eq("id", enrollmentId);
 
-  if (enrollError) {
-    console.error("Stripe webhook: failed to mark enrollment paid", enrollError);
-    // 500 so Stripe retries. The player has been charged; they must get access.
-    return new Response("Failed to update enrollment.", { status: 500 });
-  }
-
+  // Record this player's share first, then decide whether the enrollment is
+  // fully paid. A doubles pair owes two shares, so one payment is not enough.
   const { error: paymentError } = await admin
     .from("payments")
     .update({ status: "paid" })
     .eq("stripe_session_id", session.id);
 
   if (paymentError) {
-    // The enrollment is already unlocked, so the player is fine. This only
-    // affects the payment record, and is worth knowing about but not worth
-    // making Stripe retry over.
     console.error("Stripe webhook: failed to mark payment paid", paymentError);
+    return new Response("Failed to record the payment.", { status: 500 });
+  }
+
+  const { data: enrollment } = await admin
+    .from("enrollments")
+    .select("player_id, team_id")
+    .eq("id", enrollmentId)
+    .maybeSingle();
+
+  if (!enrollment) {
+    console.error("Stripe webhook: enrollment no longer exists", enrollmentId);
+    return new Response("Enrollment not found.", { status: 200 });
+  }
+
+  // Who owes a share: one player for singles, both partners for doubles.
+  let required: string[] = [];
+  if (enrollment.player_id) {
+    required = [enrollment.player_id as string];
+  } else if (enrollment.team_id) {
+    const { data: team } = await admin
+      .from("teams")
+      .select("player1_id, player2_id")
+      .eq("id", enrollment.team_id)
+      .maybeSingle();
+    if (team) required = [team.player1_id as string, team.player2_id as string];
+  }
+
+  const { data: paidRows } = await admin
+    .from("payments")
+    .select("player_id, covers_player_ids")
+    .eq("enrollment_id", enrollmentId)
+    .eq("status", "paid");
+
+  // A payment settles the payer's own share, plus anyone they covered.
+  const paidPlayers = new Set<string>();
+  for (const row of paidRows ?? []) {
+    if ((row as any).player_id) paidPlayers.add((row as any).player_id);
+    for (const id of ((row as any).covers_player_ids ?? []) as string[]) {
+      paidPlayers.add(id);
+    }
+  }
+  const everyoneHasPaid =
+    required.length > 0 && required.every((id) => paidPlayers.has(id));
+
+  if (everyoneHasPaid) {
+    const { error: enrollError } = await admin
+      .from("enrollments")
+      .update({ paid: true })
+      .eq("id", enrollmentId);
+
+    if (enrollError) {
+      console.error("Stripe webhook: failed to mark enrollment paid", enrollError);
+      // 500 so Stripe retries. Somebody has been charged and must get access.
+      return new Response("Failed to update enrollment.", { status: 500 });
+    }
   }
 
   return new Response("OK", { status: 200 });
