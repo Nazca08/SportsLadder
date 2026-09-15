@@ -47,7 +47,7 @@ export async function computeLeagueStandings(
   // ladder -- reads individual ratings.
   const { data: leagueSeason } = await supabase
     .from("league_seasons")
-    .select("league_templates(level, scoring_format)")
+    .select("league_templates(level, scoring_format, sport)")
     .eq("id", leagueSeasonId)
     .maybeSingle();
   const tpl: any = Array.isArray((leagueSeason as any)?.league_templates)
@@ -64,9 +64,23 @@ export async function computeLeagueStandings(
 
   const playerIds = (enrollments ?? []).map((e) => e.player_id).filter(Boolean) as string[];
   const { data: profiles } = isOpenLeague && playerIds.length
-    ? await supabase.from("profiles").select("id, rating").in("id", playerIds)
-    : { data: [] as { id: string; rating: string | null }[] };
-  const ratingById = new Map((profiles ?? []).map((p) => [p.id, (p as any).rating ?? null]));
+    ? await supabase
+        .from("profiles")
+        .select("id, rating, rating_tennis, rating_pickleball")
+        .in("id", playerIds)
+    : { data: [] as any[] };
+
+  // The rating for THIS sport. A 4.0 tennis player who took up pickleball in
+  // March is not a 4.0 at both, and using one number for both would hand them a
+  // bonus in one sport and a penalty in the other. Falls back to the old single
+  // rating for anyone who has not split theirs yet.
+  const leagueSport = tpl?.sport ?? "tennis";
+  const ratingById = new Map(
+    (profiles ?? []).map((p: any) => [
+      p.id,
+      (leagueSport === "tennis" ? p.rating_tennis : p.rating_pickleball) ?? p.rating ?? null,
+    ])
+  );
 
   /** A player's rating for scoring purposes. */
   const ratingOf = (entrantId: string): number =>
