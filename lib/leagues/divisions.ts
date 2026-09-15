@@ -34,5 +34,6 @@ export const AREAS: [string, string][] = [
   ["dallas-tx", "Dallas, Texas"],
   ["belmont-nc", "Belmont, North Carolina"],
   ["provo-ut", "Provo, Utah"],
+  ["heber-city-ut", "Heber City, Utah"],
   ["minneapolis-mn", "Minneapolis, Minnesota"],
 ];
