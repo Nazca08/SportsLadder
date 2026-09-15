@@ -58,16 +58,16 @@ export function leagueLabel(t: LeagueTemplateLike): string {
   const format = t.format === "doubles" ? "Doubles" : "Singles";
 
   // A named club league is identified by its name, not by its combination --
-  // "all ratings, everyone" is the point of it, so spelling out division and
-  // level would be noise.
+  // A named league is identified by its name plus what distinguishes it from
+  // the others in the same city: the division and the format.
   if (t.name) {
-    // 'open' and 'mixed' both mean everybody together, so neither needs saying
-    // -- and printing it produced "Dallas Pickleball League - Mixed Singles"
-    // next to "... - Mixed Doubles", two leagues differing only in their last
-    // word, which read as the same league listed twice. A gendered division is
-    // a real distinction and stays.
-    const everyone = t.division === "open" || t.division === "mixed";
-    const qualifier = everyone ? format : `${divisionWord(t.division)} ${format}`;
+    // Every division is now a real distinction. "Mixed" was dropped back when a
+    // city ran a single doubles league and the word added nothing -- but men's,
+    // women's and mixed doubles now sit side by side, so "Doubles" alone is
+    // genuinely ambiguous. Only 'open' stays unqualified, because there is
+    // nothing for it to be distinguished from.
+    const qualifier =
+      t.division === "open" ? format : `${divisionWord(t.division)} ${format}`;
     return `${t.name} \u00b7 ${qualifier}`;
   }
 
