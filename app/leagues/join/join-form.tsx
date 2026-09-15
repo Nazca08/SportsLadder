@@ -33,10 +33,13 @@ const SPORTS: [string, string][] = [
 export function JoinLeagueForm({
   leagues = [],
   joinedTemplateIds = [],
+  gender = "female",
 }: {
   leagues?: CatalogueLeague[];
   /** Leagues this player is already in, shown as joined rather than offered again. */
   joinedTemplateIds?: string[];
+  /** Used to hide leagues for the other gender. */
+  gender?: "male" | "female";
 }) {
   const [area, setArea] = useState("");
   const [sport, setSport] = useState("");
@@ -50,15 +53,20 @@ export function JoinLeagueForm({
   const [error, setError] = useState("");
   const [pending, startTransition] = useTransition();
 
-  // Only cities that actually hold leagues are offered, so nobody picks one and
-  // finds it empty.
-  const citiesWithLeagues = AREAS.filter(([code]) => leagues.some((l) => l.area === code));
-
-  const sportsHere = SPORTS.filter(([s]) =>
-    leagues.some((l) => l.area === area && l.sport === s)
+  // A man cannot enter the women's draw. Mixed is open to everybody.
+  const eligible = leagues.filter(
+    (l) => l.division === "mixed" || l.division === (gender === "male" ? "mens" : "womens")
   );
 
-  const visible = leagues.filter((l) => l.area === area && l.sport === sport);
+  // Only cities that actually hold leagues are offered, so nobody picks one and
+  // finds it empty.
+  const citiesWithLeagues = AREAS.filter(([code]) => eligible.some((l) => l.area === code));
+
+  const sportsHere = SPORTS.filter(([s]) =>
+    eligible.some((l) => l.area === area && l.sport === s)
+  );
+
+  const visible = eligible.filter((l) => l.area === area && l.sport === sport);
   const selected = visible.find((l) => l.id === selectedId) ?? null;
   const needsPartner = selected?.format === "doubles";
 
