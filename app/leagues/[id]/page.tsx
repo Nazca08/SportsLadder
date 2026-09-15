@@ -26,7 +26,7 @@ export default async function LeaguePage({
 
   const { data: enrollment } = await supabase
     .from("enrollments")
-    .select("league_season_id, paid")
+    .select("league_season_id, paid, team_id")
     .eq("id", params.id)
     .single();
   if (!enrollment) notFound();
@@ -47,6 +47,37 @@ export default async function LeaguePage({
   // The paywall. Everything below this point costs database queries, so gate
   // before doing any of that work rather than after.
   if (!enrollment.paid) {
+    // In doubles both partners pay their own share, so "has this enrollment
+    // been paid for" is not the same question as "have I paid". Someone who
+    // has settled up should be told they are waiting on their partner, not
+    // asked for money twice.
+    const { data: myPayment } = await supabase
+      .from("payments")
+      .select("id")
+      .eq("enrollment_id", params.id)
+      .eq("player_id", user.id)
+      .eq("status", "paid")
+      .maybeSingle();
+
+    let partnerName: string | null = null;
+    if ((enrollment as any).team_id) {
+      const { data: team } = await supabase
+        .from("teams")
+        .select("player1_id, player2_id")
+        .eq("id", (enrollment as any).team_id)
+        .maybeSingle();
+      const otherId =
+        team?.player1_id === user.id ? team?.player2_id : team?.player1_id;
+      if (otherId) {
+        const { data: other } = await supabase
+          .from("profiles")
+          .select("full_name, display_name")
+          .eq("id", otherId)
+          .maybeSingle();
+        partnerName = (other as any)?.display_name || (other as any)?.full_name || null;
+      }
+    }
+
     return (
       <PaymentGate
         enrollmentId={params.id}
@@ -54,6 +85,8 @@ export default async function LeaguePage({
         format={(template as any)?.format ?? "singles"}
         canceled={searchParams?.canceled === "1"}
         justPaid={searchParams?.paid === "1"}
+        iHavePaid={Boolean(myPayment)}
+        partnerName={partnerName}
       />
     );
   }
