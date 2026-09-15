@@ -5,6 +5,7 @@ import { resolvePickleballMatch, isValidGame } from "./pickleball";
 import { rankStandings, seedPositions, nextPowerOfTwo, type StandingsRow } from "./standings";
 import { matchPoints, winMultiplier, lossPenalty, BASE_PENALTY, POINTS_PER_GAME } from "./elo";
 import { formatPhone } from "../format";
+import { feeCentsFor, formatFee } from "../payments/checkout";
 import { resolveAnnualEntrants, type SeasonQualifiers } from "./annual-championship";
 
 describe("computePoints", () => {
@@ -503,5 +504,25 @@ describe("formatPhone", () => {
   it("handles a missing number", () => {
     expect(formatPhone(null)).toBe("");
     expect(formatPhone("")).toBe("");
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Entry pricing
+// ---------------------------------------------------------------------------
+describe("league fees", () => {
+  it("charges a singles player $25", () => {
+    expect(feeCentsFor("singles")).toBe(2500);
+  });
+
+  it("charges each doubles player $20, not the pair", () => {
+    // Both partners pay their own share, so a pair puts in $40 between them.
+    expect(feeCentsFor("doubles")).toBe(2000);
+    expect(feeCentsFor("doubles") * 2).toBe(4000);
+  });
+
+  it("formats fees for display", () => {
+    expect(formatFee(feeCentsFor("singles"))).toBe("$25.00");
+    expect(formatFee(feeCentsFor("doubles"))).toBe("$20.00");
   });
 });
