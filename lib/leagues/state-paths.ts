@@ -22,6 +22,9 @@ export const AREA_STATE: Record<string, string> = {
   "dallas-tx": "tx",
   "belmont-nc": "nc",
   "provo-ut": "ut",
+  // Heber City is also Utah. Two markets in one state share an outline; the
+  // city heading on the dashboard is what tells them apart.
+  "heber-city-ut": "ut",
   "minneapolis-mn": "mn",
   "palmas-del-mar-pr": "pr",
 };
