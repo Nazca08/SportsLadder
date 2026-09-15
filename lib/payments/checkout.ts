@@ -2,13 +2,6 @@ import Stripe from "stripe";
 import { createAdminClient } from "@/lib/supabase/admin";
 
 /**
- * Entry price for one league, for one season, in cents.
- *
- * Doubles is priced per TEAM, not per player: the schema creates one enrollment
- * per team, so the pair pays this once between them. Charging each player
- * separately would be a schema change, not a price change.
- */
-/**
  * The launch promotion. This is display only -- the discount itself lives in
  * the Stripe dashboard as a promotion code attached to a 100%-off coupon.
  * Changing this string changes what the site advertises, NOT what Stripe
@@ -17,11 +10,22 @@ import { createAdminClient } from "@/lib/supabase/admin";
 export const PROMO_CODE = "FREE2026";
 export const PROMO_BLURB = "free through the end of 2026";
 
+/**
+ * Entry price for one league, for one season, in cents.
+ *
+ * Both figures are PER PLAYER. A doubles pair therefore pays $40 between them,
+ * $20 each, rather than one of them covering the team -- which used to leave
+ * one partner chasing the other for half.
+ *
+ * The enrollment is still a single row for the team. What changed is that it
+ * only counts as paid once BOTH players have paid their own share, tracked as
+ * one payments row per player.
+ */
 export const SINGLES_FEE_CENTS = 2500;
-export const DOUBLES_TEAM_FEE_CENTS = 3500;
+export const DOUBLES_PER_PLAYER_FEE_CENTS = 2000;
 
 export function feeCentsFor(format: string): number {
-  return format === "doubles" ? DOUBLES_TEAM_FEE_CENTS : SINGLES_FEE_CENTS;
+  return format === "doubles" ? DOUBLES_PER_PLAYER_FEE_CENTS : SINGLES_FEE_CENTS;
 }
 
 export function formatFee(cents: number): string {
@@ -63,11 +67,19 @@ export async function createCheckoutUrl(
   format: string,
   leagueLabel: string,
   customerEmail?: string,
-  playerId?: string
+  playerId?: string,
+  /**
+   * Extra players this payment settles, when somebody pays for their partner
+   * too. Their ids ride along in metadata so the webhook can credit them.
+   */
+  coversPlayerIds: string[] = []
 ): Promise<string> {
   const stripe = stripeClient();
   const base = siteUrl();
-  const amountCents = feeCentsFor(format);
+  // One share per person being paid for: yourself, plus anyone you are
+  // covering.
+  const shares = 1 + coversPlayerIds.length;
+  const amountCents = feeCentsFor(format) * shares;
 
   const session = await stripe.checkout.sessions.create({
     mode: "payment",
@@ -83,7 +95,12 @@ export async function createCheckoutUrl(
           currency: "usd",
           unit_amount: amountCents,
           product_data: {
-            name: format === "doubles" ? "League entry (doubles team)" : "League entry",
+            name:
+              format === "doubles"
+                ? shares > 1
+                  ? "League entry (both players)"
+                  : "League entry (your half of a doubles pair)"
+                : "League entry",
             description: leagueLabel,
           },
         },
@@ -91,7 +108,10 @@ export async function createCheckoutUrl(
     ],
     // Read back by the webhook. Without this the payment cannot be matched to
     // an enrollment and the player pays without getting access.
-    metadata: { enrollment_id: enrollmentId },
+    metadata: {
+      enrollment_id: enrollmentId,
+      ...(coversPlayerIds.length ? { covers: coversPlayerIds.join(",") } : {}),
+    },
     success_url: `${base}/leagues/${enrollmentId}?paid=1`,
     cancel_url: `${base}/leagues/${enrollmentId}?canceled=1`,
   });
@@ -112,6 +132,7 @@ export async function createCheckoutUrl(
     status: "pending",
     player_id: playerId ?? null,
     league_label: leagueLabel,
+    covers_player_ids: coversPlayerIds,
   });
 
   return session.url;
