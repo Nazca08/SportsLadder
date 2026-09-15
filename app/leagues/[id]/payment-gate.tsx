@@ -1,5 +1,6 @@
 import { resumeCheckoutFromForm } from "@/app/leagues/join/actions";
-import { formattedFeeFor, PROMO_CODE, PROMO_BLURB } from "@/lib/payments/checkout";
+import { formattedFeeFor, feeCentsFor, formatFee, PROMO_CODE, PROMO_BLURB } from "@/lib/payments/checkout";
+import { NudgePartner } from "@/components/nudge-partner";
 import { SignOutButton } from "@/components/sign-out-button";
 import { LeaveLeagueButton } from "@/components/leave-league-button";
 
@@ -16,15 +17,22 @@ export function PaymentGate({
   format,
   canceled,
   justPaid,
+  iHavePaid,
+  partnerName,
 }: {
   enrollmentId: string;
   leagueLabel: string;
   format: string;
   canceled?: boolean;
   justPaid?: boolean;
+  /** Whether this player has settled their own share. */
+  iHavePaid?: boolean;
+  /** The other half of a doubles pair, when there is one. */
+  partnerName?: string | null;
 }) {
   const fee = formattedFeeFor(format);
   const isDoubles = format === "doubles";
+  const bothFee = formatFee(feeCentsFor(format) * 2);
 
   return (
     <main className="min-h-screen p-6 max-w-lg mx-auto">
