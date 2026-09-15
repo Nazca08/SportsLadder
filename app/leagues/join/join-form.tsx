@@ -194,7 +194,11 @@ export function JoinLeagueForm({
                     <span className="flex-1 min-w-0">
                       <span className="block text-sm font-semibold">{leagueLabel(l)}</span>
                       <span className="block text-xs text-chalk-dim mt-0.5">
-                        {already ? "You're already in this one" : "All ratings, one ladder"}
+                        {already
+                          ? "You're already in this one"
+                          : l.division === "mixed"
+                            ? "Men and women, all ratings"
+                            : "All ratings, one ladder"}
                       </span>
                     </span>
                     <FormatChip format={l.format} />
