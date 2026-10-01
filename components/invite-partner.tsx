@@ -21,7 +21,11 @@ export function InvitePartner({
 }) {
   const [copied, setCopied] = useState(false);
 
-  const who = searchedFor ? `"${searchedFor}"` : "them";
+  // Shown both before a search (nobody has typed anything yet) and after one
+  // that found nobody, so the heading has to read sensibly either way.
+  const heading = searchedFor
+    ? `No account for "${searchedFor}" yet.`
+    : "Partner not on RallyRank yet?";
   const message =
     `${myName} here — I'm signing us up for a doubles league on RallyRank.club. ` +
     `Create an account with this link and I'll add you as my partner: ${url}`;
@@ -38,7 +42,7 @@ export function InvitePartner({
 
   return (
     <div className="rounded-lg border border-ball/40 bg-ball/10 p-3">
-      <p className="text-sm mb-1">No account for {who} yet.</p>
+      <p className="text-sm mb-1">{heading}</p>
       <p className="text-chalk-dim text-xs mb-3">
         Send them a link to sign up. Once they have, come back and they&apos;ll show up in
         the search.
