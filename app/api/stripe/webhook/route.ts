@@ -99,19 +99,49 @@ export async function POST(req: Request) {
   if (enrollment.player_id) {
     required = [enrollment.player_id as string];
   } else if (enrollment.team_id) {
-    const { data: team } = await admin
+    const { data: team, error: teamError } = await admin
       .from("teams")
       .select("player1_id, player2_id")
       .eq("id", enrollment.team_id)
       .maybeSingle();
-    if (team) required = [team.player1_id as string, team.player2_id as string];
+    if (teamError || !team) {
+      console.error("Stripe webhook: could not read the team", enrollment.team_id, teamError);
+      // 500 so Stripe retries. Without the team there is no way to know who
+      // owes a share, and guessing would either lock out a paid pair or let an
+      // unpaid one in.
+      return new Response("Could not read the team.", { status: 500 });
+    }
+    required = [team.player1_id as string, team.player2_id as string];
   }
 
-  const { data: paidRows } = await admin
+  // `covers_player_ids` arrives with migration 0027, and PostgREST fails the
+  // WHOLE select when one column is unknown. This used to swallow that error
+  // and carry on with no rows, which meant nobody counted as having paid and
+  // the enrollment stayed locked even after both partners had paid. Fall back
+  // to the columns that have always existed.
+  let { data: paidRows, error: paidError } = await admin
     .from("payments")
     .select("player_id, covers_player_ids")
     .eq("enrollment_id", enrollmentId)
     .eq("status", "paid");
+
+  if (paidError) {
+    console.error(
+      "payments.covers_player_ids is missing -- run migration 0027. " +
+        "Falling back; paying for a partner will not be credited until it lands."
+    );
+    ({ data: paidRows, error: paidError } = await admin
+      .from("payments")
+      .select("player_id")
+      .eq("enrollment_id", enrollmentId)
+      .eq("status", "paid") as any);
+  }
+
+  if (paidError) {
+    console.error("Stripe webhook: could not read payments", paidError);
+    // 500 so Stripe retries. Money has moved; somebody is owed access.
+    return new Response("Could not read payments.", { status: 500 });
+  }
 
   // A payment settles the payer's own share, plus anyone they covered.
   const paidPlayers = new Set<string>();
