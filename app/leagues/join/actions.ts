@@ -61,6 +61,9 @@ export async function joinLeague(formData: FormData): Promise<JoinResult | void>
   if (!supabase || !user) redirect("/login");
 
   let checkoutUrl: string;
+  // Set when this player already holds a place here, in which case no second
+  // enrollment is created and they are sent to the existing one instead.
+  let existingEnrollmentId: string | null = null;
 
   try {
     const partnerId = formData.get("partnerId") ? String(formData.get("partnerId")) : null;
@@ -113,6 +116,34 @@ export async function joinLeague(formData: FormData): Promise<JoinResult | void>
 
       template = { sport, format, division, level, area, name: null };
       leagueSeasonId = await ensureLeagueSeason(sport, format, division, level, area);
+    }
+
+    // Both halves of a doubles pair sign up through this same form. Until now
+    // the second one to arrive created a SECOND team and a SECOND enrollment
+    // for the same two people, so each player paid one share into a different
+    // row and neither pair ever reached two-of-two. The screen said "waiting on
+    // your partner" forever while the partner sat on an identical screen.
+    //
+    // Checked for singles too: a player who joins the same league twice ends up
+    // with two unpaid enrollments and no idea which one to pay.
+    const alreadyIn = await findMyEnrollment(supabase, leagueSeasonId, user.id);
+    if (alreadyIn) {
+      existingEnrollmentId = alreadyIn;
+      revalidatePath("/dashboard");
+      return;
+    }
+
+    // The other half being spoken for is a different problem, and silently
+    // making a second team for them would recreate the same mess.
+    if (format === "doubles" && partnerId) {
+      const partnerIn = await findMyEnrollment(supabase, leagueSeasonId, partnerId);
+      if (partnerIn) {
+        return {
+          error:
+            "Your partner is already entered in this league with somebody else. " +
+            "Ask them to leave it first, or pick a different partner.",
+        };
+      }
     }
 
     let entrantId: string;
@@ -169,7 +200,46 @@ export async function joinLeague(formData: FormData): Promise<JoinResult | void>
     return { error: describe(e) };
   }
 
+  // Outside the try: redirect() works by throwing.
+  if (existingEnrollmentId) redirect(`/leagues/${existingEnrollmentId}`);
   redirect(checkoutUrl);
+}
+
+/**
+ * The enrollment this player already holds in a league season, if any --
+ * whether they entered alone or as half of a pair.
+ *
+ * RLS allows this: is_enrolled() counts team membership, so both halves of a
+ * pair can see the enrollment the other one created.
+ */
+async function findMyEnrollment(
+  supabase: any,
+  leagueSeasonId: string,
+  playerId: string
+): Promise<string | null> {
+  const { data: direct } = await supabase
+    .from("enrollments")
+    .select("id")
+    .eq("league_season_id", leagueSeasonId)
+    .eq("player_id", playerId)
+    .limit(1);
+  if (direct?.length) return direct[0].id as string;
+
+  const { data: teams } = await supabase
+    .from("teams")
+    .select("id")
+    .eq("league_season_id", leagueSeasonId)
+    .or(`player1_id.eq.${playerId},player2_id.eq.${playerId}`);
+  const teamIds = (teams ?? []).map((t: any) => t.id);
+  if (!teamIds.length) return null;
+
+  const { data: viaTeam } = await supabase
+    .from("enrollments")
+    .select("id")
+    .eq("league_season_id", leagueSeasonId)
+    .in("team_id", teamIds)
+    .limit(1);
+  return (viaTeam?.[0]?.id as string) ?? null;
 }
 
 /**
