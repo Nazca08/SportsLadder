@@ -125,7 +125,7 @@ export async function createCheckoutUrl(
   // player_id and league_label are snapshots. A player can leave a league they
   // paid for, which nulls enrollment_id -- these keep the payment record
   // answerable on its own afterwards.
-  await admin.from("payments").insert({
+  const row: Record<string, unknown> = {
     enrollment_id: enrollmentId,
     stripe_session_id: session.id,
     amount_cents: amountCents,
@@ -133,7 +133,44 @@ export async function createCheckoutUrl(
     player_id: playerId ?? null,
     league_label: leagueLabel,
     covers_player_ids: coversPlayerIds,
-  });
+  };
+
+  let { error } = await admin.from("payments").insert(row);
+
+  // `covers_player_ids` arrives with migration 0027, and PostgREST rejects the
+  // WHOLE insert when one column is unknown. That used to fail silently here --
+  // no payment row, so the webhook had nothing to mark paid, so every player
+  // paid and stayed locked out. Rather than depend on a migration having been
+  // run, drop the column and retry: paying for a partner stops working until
+  // 0027 lands, but ordinary payments go through.
+  if (error && isUnknownColumn(error, "covers_player_ids")) {
+    console.error(
+      "payments.covers_player_ids is missing -- run migration 0027. " +
+        "Paying for a partner is unavailable until then."
+    );
+    delete row.covers_player_ids;
+    ({ error } = await admin.from("payments").insert(row));
+  }
+
+  // Never send anyone to Stripe on the back of a payment we failed to record.
+  // The webhook matches on this row; without it the money moves and the
+  // enrollment stays locked forever.
+  if (error) {
+    console.error("Failed to record the pending payment", error);
+    throw new Error(
+      `Could not start checkout: the payment could not be recorded (${
+        error.message || error.code || "unknown error"
+      }).`
+    );
+  }
 
   return session.url;
+}
+
+/** True when PostgREST is complaining that a column does not exist. */
+function isUnknownColumn(error: { code?: string; message?: string }, column: string): boolean {
+  // PGRST204 is "column not found in schema cache"; 42703 is Postgres's own
+  // undefined_column. Both have been seen depending on how stale the cache is.
+  if (error.code === "PGRST204" || error.code === "42703") return true;
+  return Boolean(error.message && error.message.includes(column));
 }
