@@ -11,9 +11,20 @@ export default async function JoinLeaguePage() {
 
   const { data: profile } = await supabase
     .from("profiles")
-    .select("gender, rating, full_name, display_name, referral_code")
+    .select("gender, rating, full_name, display_name")
     .eq("id", user.id)
-    .single();
+    .maybeSingle();
+
+  // Asked for separately on purpose. `referral_code` arrives with migration
+  // 0024, and PostgREST fails the WHOLE select if one column is missing -- so
+  // folding it into the query above meant an unrun migration wiped out
+  // `gender` too, and every player was quietly treated as a woman and shown
+  // the wrong half of the catalogue.
+  const { data: referral } = await supabase
+    .from("profiles")
+    .select("referral_code")
+    .eq("id", user.id)
+    .maybeSingle();
 
   // The catalogue. Leagues are a fixed list now, created by migration rather
   // than conjured from dropdown choices, so the page lists what exists.
@@ -40,8 +51,8 @@ export default async function JoinLeaguePage() {
   // The player's own referral link, so an invite sent from here also credits
   // them with the signup.
   const base = (process.env.NEXT_PUBLIC_SITE_URL ?? "https://rallyrank.club").replace(/\/$/, "");
-  const referralUrl = (profile as any)?.referral_code
-    ? `${base}/?ref=${(profile as any).referral_code}`
+  const referralUrl = (referral as any)?.referral_code
+    ? `${base}/?ref=${(referral as any).referral_code}`
     : base;
   const myName =
     (profile as any)?.display_name || (profile as any)?.full_name || "A player";
