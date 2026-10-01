@@ -35,12 +35,31 @@ export default async function JoinLeaguePage() {
     .order("name");
 
   // Leagues this player is already in, so they are shown as joined rather than
-  // offered again and rejected by the unique index.
+  // offered again.
   const { data: mine } = await supabase
     .from("enrollments")
     .select("league_seasons(league_template_id)")
     .eq("player_id", user.id);
-  const joinedTemplateIds = (mine ?? [])
+
+  // ...and the ones entered as half of a doubles pair, where the enrollment
+  // belongs to the TEAM and `player_id` is null. Leaving these out meant a
+  // doubles league never showed as joined, so both halves of a pair could --
+  // and did -- enter it a second time, each creating their own team and paying
+  // into their own enrollment. Neither ever reached two-of-two.
+  const { data: myTeams } = await supabase
+    .from("teams")
+    .select("id")
+    .or(`player1_id.eq.${user.id},player2_id.eq.${user.id}`);
+  const myTeamIds = (myTeams ?? []).map((t: any) => t.id);
+
+  const { data: mineViaTeam } = myTeamIds.length
+    ? await supabase
+        .from("enrollments")
+        .select("league_seasons(league_template_id)")
+        .in("team_id", myTeamIds)
+    : { data: [] as any[] };
+
+  const joinedTemplateIds = [...(mine ?? []), ...(mineViaTeam ?? [])]
     .map((row: any) =>
       Array.isArray(row.league_seasons)
         ? row.league_seasons[0]?.league_template_id
