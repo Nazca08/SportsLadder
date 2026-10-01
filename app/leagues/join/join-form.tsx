@@ -111,7 +111,10 @@ export function JoinLeagueForm({
     if (partner) formData.set("partnerId", partner.id);
     startTransition(async () => {
       try {
-        await joinLeague(formData);
+        // A successful join redirects to Stripe and never returns. Anything
+        // that comes back is a failure carrying its real message.
+        const result = await joinLeague(formData);
+        if (result?.error) setError(result.error);
       } catch (e) {
         setError(e instanceof Error ? e.message : "Something went wrong.");
       }
@@ -225,8 +228,11 @@ export function JoinLeagueForm({
 
           {/* An empty search used to be a dead end: no results, no explanation,
               no way to join a doubles league at all. Now it becomes the next
-              step. */}
-          {noMatches && !searching && !partner && referralUrl && (
+              step -- and it is offered before the search too, because a city
+              that has just opened has nobody to find yet, and a player who has
+              not typed anything has no way of learning that inviting is even
+              possible. */}
+          {!searching && !partner && partnerResults.length === 0 && referralUrl && (
             <div className="mt-3">
               <InvitePartner
                 url={referralUrl}
