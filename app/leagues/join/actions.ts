@@ -27,107 +27,148 @@ export async function searchPlayers(query: string): Promise<PlayerSearchResult[]
   return data ?? [];
 }
 
-export async function joinLeague(formData: FormData) {
+/**
+ * Why this returns `{ error }` instead of throwing.
+ *
+ * Next.js redacts any error thrown out of a server action in production and
+ * replaces it with a digest. Every real cause -- a missing column because a
+ * migration has not been run, an RLS refusal, a duplicate enrollment -- arrived
+ * on screen as the same meaningless string, which turned every bug report into
+ * a guessing game. Returning the message keeps it intact.
+ *
+ * `redirect()` is deliberately called outside the try/catch: it works by
+ * throwing, so catching it would swallow the successful path.
+ */
+export type JoinResult = { error: string };
+
+function describe(e: unknown): string {
+  if (e && typeof e === "object") {
+    const err = e as Record<string, any>;
+    // A PostgrestError. `message` alone is often "" or a bare code, so the
+    // details and hint travel with it.
+    if (err.message || err.code) {
+      const parts = [err.message, err.details, err.hint].filter(Boolean);
+      const text = parts.join(" — ") || "Database error";
+      return err.code ? `${text} (${err.code})` : text;
+    }
+  }
+  if (e instanceof Error) return e.message;
+  return "Something went wrong.";
+}
+
+export async function joinLeague(formData: FormData): Promise<JoinResult | void> {
   const { supabase, user } = await getAuthedClient();
   if (!supabase || !user) redirect("/login");
 
-  const partnerId = formData.get("partnerId") ? String(formData.get("partnerId")) : null;
+  let checkoutUrl: string;
 
-  // A named club league is picked whole, so its sport/format/etc come from the
-  // stored row rather than from dropdowns the player never saw.
-  const clubTemplateId = formData.get("clubTemplateId")
-    ? String(formData.get("clubTemplateId"))
-    : null;
+  try {
+    const partnerId = formData.get("partnerId") ? String(formData.get("partnerId")) : null;
 
-  let sport: string;
-  let format: string;
-  let division: string;
-  let level: string;
-  let area: string;
-  let template: Record<string, any> | null = null;
-  let leagueSeasonId: string;
+    // A named club league is picked whole, so its sport/format/etc come from the
+    // stored row rather than from dropdowns the player never saw.
+    const clubTemplateId = formData.get("clubTemplateId")
+      ? String(formData.get("clubTemplateId"))
+      : null;
 
-  if (clubTemplateId) {
-    const { data: row } = await supabase
-      .from("league_templates")
-      .select("sport, format, division, level, area, name")
-      .eq("id", clubTemplateId)
-      .single();
-    if (!row) throw new Error("That league no longer exists.");
+    let format: string;
+    let template: Record<string, any> | null = null;
+    let leagueSeasonId: string;
 
-    template = row;
-    sport = String(row.sport);
-    format = String(row.format);
-    division = String(row.division);
-    level = String(row.level);
-    area = String(row.area);
+    if (clubTemplateId) {
+      const { data: row, error: templateError } = await supabase
+        .from("league_templates")
+        .select("sport, format, division, level, area, name")
+        .eq("id", clubTemplateId)
+        .maybeSingle();
+      if (templateError) return { error: describe(templateError) };
+      if (!row) return { error: "That league no longer exists." };
 
-    if (format === "doubles" && !partnerId) {
-      throw new Error("Pick a partner to join a doubles league.");
+      template = row;
+      format = String(row.format);
+
+      if (format === "doubles" && !partnerId) {
+        return { error: "Pick a partner to join a doubles league." };
+      }
+
+      // Save the rating on the profile so it follows the player everywhere,
+      // rather than being trapped in this one enrollment.
+      const myRating = formData.get("myRating") ? String(formData.get("myRating")) : "";
+      if (myRating) {
+        await supabase.from("profiles").update({ rating: myRating }).eq("id", user.id);
+      }
+
+      leagueSeasonId = await ensureLeagueSeasonForTemplate(clubTemplateId);
+    } else {
+      const sport = String(formData.get("sport"));
+      format = String(formData.get("format"));
+      const division = String(formData.get("division"));
+      const level = String(formData.get("level"));
+      const area = String(formData.get("area"));
+
+      if (!area) return { error: "Pick your area to continue." };
+      if (format === "doubles" && !partnerId) {
+        return { error: "Pick a partner to join a doubles league." };
+      }
+
+      template = { sport, format, division, level, area, name: null };
+      leagueSeasonId = await ensureLeagueSeason(sport, format, division, level, area);
     }
 
-    // Save the rating on the profile so it follows the player everywhere,
-    // rather than being trapped in this one enrollment.
-    const myRating = formData.get("myRating") ? String(formData.get("myRating")) : "";
-    if (myRating) {
-      await supabase.from("profiles").update({ rating: myRating }).eq("id", user.id);
+    let entrantId: string;
+    if (format === "doubles") {
+      // A team of one is not a team. Without this the RPC would be handed a
+      // null second player and fail somewhere far less legible.
+      if (!partnerId) return { error: "Pick a partner to join a doubles league." };
+      if (partnerId === user.id) {
+        return { error: "You cannot pair with yourself. Pick a different partner." };
+      }
+
+      const { data: profile } = await supabase
+        .from("profiles").select("full_name").eq("id", user.id).maybeSingle();
+      const { data: partner } = await supabase
+        .from("profiles").select("full_name").eq("id", partnerId).maybeSingle();
+      if (!partner) {
+        return { error: "That partner no longer has an account. Search again." };
+      }
+
+      const { data: teamId, error: teamError } = await supabase.rpc("create_team", {
+        p_league_season_id: leagueSeasonId,
+        p_name: `${profile?.full_name ?? "You"} & ${partner.full_name ?? "Partner"}`,
+        p_player1_id: user.id,
+        p_player2_id: partnerId,
+      });
+      if (teamError) return { error: `Could not create the team: ${describe(teamError)}` };
+      if (!teamId) return { error: "Could not create the team." };
+      entrantId = teamId as string;
+    } else {
+      entrantId = user.id;
     }
 
-    leagueSeasonId = await ensureLeagueSeasonForTemplate(clubTemplateId);
-  } else {
-    sport = String(formData.get("sport"));
-    format = String(formData.get("format"));
-    division = String(formData.get("division"));
-    level = String(formData.get("level"));
-    area = String(formData.get("area"));
-
-    if (!area) {
-      throw new Error("Pick your area to continue.");
-    }
-    if (format === "doubles" && !partnerId) {
-      throw new Error("Pick a partner to join a doubles league.");
-    }
-
-    template = { sport, format, division, level, area, name: null };
-    leagueSeasonId = await ensureLeagueSeason(sport, format, division, level, area);
-  }
-
-  let entrantId: string;
-  if (format === "doubles") {
-    const { data: profile } = await supabase.from("profiles").select("full_name").eq("id", user.id).single();
-    const { data: partner } = await supabase.from("profiles").select("full_name").eq("id", partnerId!).single();
-
-    const { data: teamId, error: teamError } = await supabase.rpc("create_team", {
+    const { data: enrollmentId, error: enrollError } = await supabase.rpc("create_enrollment", {
       p_league_season_id: leagueSeasonId,
-      p_name: `${profile?.full_name ?? "You"} & ${partner?.full_name ?? "Partner"}`,
-      p_player1_id: user.id,
-      p_player2_id: partnerId!,
+      p_player_id: format === "doubles" ? null : user.id,
+      p_team_id: format === "doubles" ? entrantId : null,
+      p_paid: false,
     });
-    if (teamError) throw teamError;
-    entrantId = teamId as string;
-  } else {
-    entrantId = user.id;
+    if (enrollError) return { error: `Could not join the league: ${describe(enrollError)}` };
+    if (!enrollmentId) return { error: "Could not join the league." };
+
+    revalidatePath("/dashboard");
+
+    // The enrollment exists but is unpaid, so it grants no access yet. Send the
+    // player to Stripe; the webhook flips `paid` when the payment clears.
+    checkoutUrl = await createCheckoutUrl(
+      enrollmentId as string,
+      format,
+      leagueLabel(template as any),
+      user.email ?? undefined,
+      user.id
+    );
+  } catch (e) {
+    return { error: describe(e) };
   }
 
-  const { data: enrollmentId, error: enrollError } = await supabase.rpc("create_enrollment", {
-    p_league_season_id: leagueSeasonId,
-    p_player_id: format === "doubles" ? null : user.id,
-    p_team_id: format === "doubles" ? entrantId : null,
-    p_paid: false,
-  });
-  if (enrollError) throw enrollError;
-
-  revalidatePath("/dashboard");
-
-  // The enrollment exists but is unpaid, so it grants no access yet. Send the
-  // player to Stripe; the webhook flips `paid` when the payment clears.
-  const checkoutUrl = await createCheckoutUrl(
-    enrollmentId as string,
-    format,
-    leagueLabel(template as any),
-    user.email ?? undefined,
-    user.id
-  );
   redirect(checkoutUrl);
 }
 
