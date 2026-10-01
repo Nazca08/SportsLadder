@@ -14,11 +14,22 @@ export type LeagueTemplateLike = {
   name?: string | null;
 } | null;
 
+/**
+ * Must stay in step with AREAS in lib/leagues/divisions.ts. When it drifts, a
+ * city keeps working but shows its raw code -- "belmont-nc" in the league
+ * label, and "belmont-nc" offered as the default place to meet for a match.
+ *
+ * The retired codes stay because rows created under them still exist.
+ */
 const AREA_NAMES: Record<string, string> = {
-  "dallas-tx": "Dallas, Texas",
-  "utah-valley-ut": "Utah Valley, Utah",
   "palmas-del-mar-pr": "Palmas Del Mar, Puerto Rico",
+  "dallas-tx": "Dallas, Texas",
+  "belmont-nc": "Belmont, North Carolina",
+  "provo-ut": "Provo, Utah",
+  "heber-city-ut": "Heber City, Utah",
   "minneapolis-mn": "Minneapolis, Minnesota",
+  // Retired markets, kept so old rows still read as places.
+  "utah-valley-ut": "Utah Valley, Utah",
   "raleigh-nc": "Raleigh, North Carolina",
 };
 
@@ -33,10 +44,13 @@ export function areaName(code?: string | null): string {
  * reads like somewhere you would play; "Palmas Del Mar, Puerto Rico" does not.
  */
 const AREA_SHORT: Record<string, string> = {
-  "dallas-tx": "Dallas",
-  "utah-valley-ut": "Utah Valley",
   "palmas-del-mar-pr": "Palmas Del Mar",
+  "dallas-tx": "Dallas",
+  "belmont-nc": "Belmont",
+  "provo-ut": "Provo",
+  "heber-city-ut": "Heber City",
   "minneapolis-mn": "Minneapolis",
+  "utah-valley-ut": "Utah Valley",
   "raleigh-nc": "Raleigh",
 };
 
@@ -57,7 +71,6 @@ export function leagueLabel(t: LeagueTemplateLike): string {
 
   const format = t.format === "doubles" ? "Doubles" : "Singles";
 
-  // A named club league is identified by its name, not by its combination --
   // A named league is identified by its name plus what distinguishes it from
   // the others in the same city: the division and the format.
   if (t.name) {
